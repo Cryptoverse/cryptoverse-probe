@@ -13,7 +13,9 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key, l
 difficultyFudge = int(os.getenv('DIFFICULTY_FUDGE', '0'))
 difficultyInterval = int(os.getenv('DIFFICULTY_INTERVAL', '7560'))
 difficultyDuration = int(os.getenv('DIFFICULTY_DURATION', '1209600'))
+difficultyStart = int(os.getenv('DIFFICULTY_START', '486604799'))
 maximumTarget = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+emptyTarget = '0000000000000000000000000000000000000000000000000000000000000000'
 
 if not 0 <= difficultyFudge <= 8:
 	raise ValueError('DIFFICULTY_FUDGE must be a value from 0 to 8 (inclusive)')
@@ -31,7 +33,7 @@ def isGenesisStarLogParent(sha):
 	Results:
 		bool: True if equal to the hash of the parent of the genesis block's parent.
 	'''
-	return sha == '0000000000000000000000000000000000000000000000000000000000000000'
+	return sha == emptyTarget
 
 def sha256(message):
 	'''Sha256 hash of message.

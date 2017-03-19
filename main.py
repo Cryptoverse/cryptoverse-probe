@@ -15,7 +15,25 @@ starLogsUrl = hostUrl + '/star-logs'
 difficultyFudge = None
 difficultyInterval = None
 difficultyDuration = None
+difficultyStart = None
 util = None
+
+def getGenesis():
+	return {
+		'log_header': None,
+		'nonce': 0,
+		'hash': util.emptyTarget,
+		'difficulty': difficultyStart,
+		'state': {
+			'fleet': None,
+			'jumps': [],
+			'star_systems': []
+		},
+		'version': 0,
+		'time': 0,
+		'previous_hash': util.emptyTarget,
+		'state_hash': None
+	}
 
 def prettyJson(serialized):
 	return json.dumps(serialized, sort_keys=True, indent=4, separators=(',', ': '))
@@ -35,11 +53,40 @@ def postRequest(url, payload=None):
 		traceback.print_exc()
 		print 'error on post request '+url
 
-def createCommand(function, description):
+def createCommand(function, description, details=None):
 	return {
 		'function': function,
-		'description': description
+		'description': description,
+		'details': details
 	}
+
+def commandHelp(commands, params=None):
+	helpMessage = 'help\tThis help message'
+	exitMessage = 'exit\tEnds this process'
+	if params:
+		if 0 < len(params):
+			queriedCommandName = params[0]
+			selection = commands.get(queriedCommandName, None)
+			if selection:
+				print '%s\t%s' % (queriedCommandName, selection['description'])
+				details = selection['details']
+				if details:
+					for detail in selection['details']:
+						print '\t * %s' % detail
+				return
+			elif queriedCommandName == 'help':
+				print helpMessage
+				return
+			elif queriedCommandName == 'exit':
+				print exitMessage
+				return
+			print 'Command "%s" is not recognized, try typing "help" for a list of all commands'
+			return
+
+	print helpMessage
+	for curr in commands:
+		print '%s\t%s' % (curr, commands[curr]['description'])
+	print exitMessage
 
 def info():
 	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration) 
@@ -47,7 +94,11 @@ def info():
 def chain():
 	print prettyJson(getRequest(starLogsUrl))
 
-def probe(height=None):
+def probe(params=None):
+	height = None
+	if params:
+		if 0 < len(params):
+			height = int(params[0])
 	generated = generateNextStarLog(height)
 	print 'Probed new starlog'
 	print prettyJson(generated)
@@ -59,7 +110,12 @@ def probe(height=None):
 		print 'Something went wrong when trying to post the generated starlog'
 
 def generateNextStarLog(height=None):
-	result = getRequest(chainsUrl, {'height': height})
+	result = None
+	if height == -1:
+		result = [getGenesis()]
+	else:
+		result = getRequest(chainsUrl, {'height': height})
+
 	if not result:
 		print 'Latest starlog request returned null or empty'
 		return
@@ -104,47 +160,47 @@ if __name__ == '__main__':
 	difficultyFudge = rules['difficulty_fudge']
 	difficultyInterval = rules['difficulty_interval']
 	difficultyDuration = rules['difficulty_duration']
+	difficultyStart = rules['difficulty_start']
 
-	os.environ["DIFFICULTY_FUDGE"] = str(difficultyFudge)
-	os.environ["DIFFICULTY_INTERVAL"] = str(difficultyInterval)
-	os.environ["DIFFICULTY_DURATION"] = str(difficultyDuration)
-	
+	os.environ['DIFFICULTY_FUDGE'] = str(difficultyFudge)
+	os.environ['DIFFICULTY_INTERVAL'] = str(difficultyInterval)
+	os.environ['DIFFICULTY_DURATION'] = str(difficultyDuration)
+	os.environ['DIFFICULTY_START'] = str(difficultyStart)
+
 	import util as util
 
-	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration)
+	print 'Connected to %s with fudge %s, interval %s, duration %s, starting difficulty %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart)
 	
-	commands = {
-		'info': createCommand(info, 'displays information about the connected server'),
-		'chain': createCommand(chain, 'retrieves the latest starlog'),
-		'probe': createCommand(probe, 'probes the next entry in the chain')
+	allCommands = {
+		'info': createCommand(info, 'Displays information about the connected server'),
+		'chain': createCommand(chain, 'Retrieves the latest starlog'),
+		'probe': createCommand(probe, 'Probes the starlog in the chain', ['Passing no arguments probes for a new starlog ontop of the highest chain member', 'Passing -1 probes for a new genesis starlog', 'Passing a valid starlog height probes for starlogs on top of that memeber of the chain'])
 	}
 
 	exited = False
 	while not exited:
 		command = raw_input('> ')
-		if not command:
-			print 'Type help for more commands'
-			continue
-		args = command.split(' ')
-		selection = commands.get(args[0], None)
-		if not selection:
-			if command == 'help':
-				print 'help\tthis help message'
-				for curr in commands:
-					print '%s\t%s' % (curr, commands[curr]['description'])
-				print 'exit\tends this process'
-			elif command == 'exit':
-				print 'Exiting...'
-				exited = True
-			else:
-				print 'No command "%s" found, try typing help for more commands' % command
-		else:
-			try:
-				params = args[1:]
-				if not params:
-					selection['function']()
+		try:
+			if not command:
+				print 'Type help for more commands'
+				continue
+			args = command.split(' ')
+			commandName = args[0]
+			commandArgs = args[1:]
+			selectedCommand = allCommands.get(commandName, None)
+			if not selectedCommand:
+				if commandName == 'help':
+					commandHelp(allCommands, commandArgs)
+				elif commandName == 'exit':
+					print 'Exiting...'
+					exited = True
 				else:
-					selection['function'](params)
-			except:
-				traceback.print_exc()
-				print 'Error with your last command'
+					print 'No command "%s" found, try typing help for more commands' % command
+			else:
+				if not commandArgs:
+					selectedCommand['function']()
+				else:
+					selectedCommand['function'](commandArgs)
+		except:
+			traceback.print_exc()
+			print 'Error with your last command'	

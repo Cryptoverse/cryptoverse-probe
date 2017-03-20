@@ -1,12 +1,14 @@
 import traceback
 import os
 import json
-import time
-import copy
 import sys
 from datetime import datetime
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
 import requests
 
+persistentFileName = 'persistent.json'
 hostUrl = os.getenv('HOST_URL', 'http://localhost:5000')
 rulesUrl = hostUrl + '/rules'
 chainsUrl = hostUrl + '/chains'
@@ -17,6 +19,7 @@ difficultyInterval = None
 difficultyDuration = None
 difficultyStart = None
 util = None
+persistentData = None
 
 def getGenesis():
 	return {
@@ -33,6 +36,52 @@ def getGenesis():
 		'time': 0,
 		'previous_hash': util.emptyTarget,
 		'state_hash': None
+	}
+
+def loadPersistent():
+	if os.path.isfile(persistentFileName):
+		with open(persistentFileName) as persistentFile:
+			return json.load(persistentFile)
+	return None
+
+def savePersistent(serialized):
+	persistentFile = open(persistentFileName, 'w')
+	persistentFile.write(prettyJson(serialized))
+	persistentFile.close()
+
+def generatePersistent():
+	return {
+		'current_account': 'default',
+		'accounts': { 'default': generateAccount() }
+	}
+
+def generateAccount():
+	privateKey = rsa.generate_private_key(
+		public_exponent=65537,
+		key_size=2048,
+		backend=default_backend()
+	)
+	privateSerialized = privateKey.private_bytes(
+		encoding=serialization.Encoding.PEM,
+		format=serialization.PrivateFormat.PKCS8,
+		encryption_algorithm=serialization.BestAvailableEncryption(b'mypassword')
+	)
+	publicSerialized = privateKey.public_key().public_bytes(
+		encoding=serialization.Encoding.PEM,
+		format=serialization.PublicFormat.SubjectPublicKeyInfo
+	)
+	privateLines = privateSerialized.splitlines()
+	privateShrunk = ''
+	for line in range(1, len(privateLines) - 1):
+		privateShrunk += privateLines[line].strip('\n')
+	publicLines = publicSerialized.splitlines()
+	publicShrunk = ''
+	for line in range(1, len(publicLines) - 1):
+		publicShrunk += publicLines[line].strip('\n')
+	
+	return {
+		'private_key': privateShrunk,
+		'public_key': publicShrunk
 	}
 
 def prettyJson(serialized):
@@ -61,32 +110,79 @@ def createCommand(function, description, details=None):
 	}
 
 def commandHelp(commands, params=None):
-	helpMessage = 'help\tThis help message'
-	exitMessage = 'exit\tEnds this process'
+	helpMessage = '%sThis help message'
+	exitMessage = '%sEnds this process'
 	if params:
 		if 0 < len(params):
 			queriedCommandName = params[0]
 			selection = commands.get(queriedCommandName, None)
 			if selection:
-				print '%s\t%s' % (queriedCommandName, selection['description'])
+				print '%s' % selection['description']
 				details = selection['details']
 				if details:
 					for detail in selection['details']:
-						print '\t * %s' % detail
+						print '\t - %s' % detail
 				return
 			elif queriedCommandName == 'help':
-				print helpMessage
+				print helpMessage % ''
 				return
 			elif queriedCommandName == 'exit':
-				print exitMessage
+				print exitMessage % ''
 				return
 			print 'Command "%s" is not recognized, try typing "help" for a list of all commands'
 			return
 
-	print helpMessage
+	print helpMessage % 'help\t - '
 	for curr in commands:
-		print '%s\t%s' % (curr, commands[curr]['description'])
-	print exitMessage
+		print '%s\t - %s' % (curr, commands[curr]['description'])
+	print exitMessage % 'exit\t - '
+
+def getAccount(name=None):
+	if persistentData:
+		accountName = name if name else persistentData['current_account']
+		if accountName:
+			accounts = persistentData['accounts']
+			if accounts:
+				currentAccount = accounts.get(accountName, None)
+				if currentAccount:
+					return (accountName, currentAccount)
+	return None
+
+def account(params=None):
+	if params:
+		if len(params) == 1:
+			primaryParam = params[0]
+			if primaryParam == 'all':
+				accountAll()
+				return
+		allParams = ''
+		for param in params:
+			allParams += ' %s' % param
+		print 'Unrecognized parameters "%s"' % allParams
+	else:
+		result = getAccount()
+		if result:
+			accountName = result[0]
+			currentAccount = result[1]
+			print 'Using account "%s"' % accountName
+			print '\tPrivate Key: %s...' % currentAccount['private_key'][:16]
+			print '\tPublic Key:  %s...' % currentAccount['public_key'][:16]
+		else:
+			print 'No active account'
+
+def accountAll():
+	message = 'No account information stored in %s' % persistentFileName
+	if persistentData and persistentData['accounts']:
+		currentAccount = persistentData['current_account']
+		keys = persistentData['accounts'].keys()
+		if 0 < len(keys):
+			message = 'Persistent data contains the following account entries'
+			entryMessage = '\n%s\t- %s\n\t\tPrivate Key: %s...\n\t\tPublic Key:  %s...'
+			for key in keys:
+				currentEntry = persistentData['accounts'][key]
+				activeFlag = '[CURR] ' if currentAccount == key else ''
+				message += entryMessage % (activeFlag, key, currentEntry['private_key'][:16], currentEntry['public_key'][:16])
+	print message
 
 def info():
 	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration) 
@@ -110,16 +206,21 @@ def probe(params=None):
 		print 'Something went wrong when trying to post the generated starlog'
 
 def generateNextStarLog(height=None):
-	result = None
-	if height == -1:
-		result = [getGenesis()]
-	else:
+	starLog = getGenesis()
+	if height:
+		if height < -1:
+			raise ValueError('Paremeter "height" is out of range')
+		if height != -1:
+			result = getRequest(chainsUrl, {'height': height})
+			if result:
+				starLog = result[0]
+			else:
+				raise ValueError('No starlog at specified height could be retrieved')
+	if not height:
 		result = getRequest(chainsUrl, {'height': height})
+		if result:
+			starLog = result[0]
 
-	if not result:
-		print 'Latest starlog request returned null or empty'
-		return
-	starLog = result[0]
 	starLog['state'] = {
 		'fleet': None,
 		'jumps': [],
@@ -172,12 +273,48 @@ if __name__ == '__main__':
 	print 'Connected to %s with fudge %s, interval %s, duration %s, starting difficulty %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart)
 	
 	allCommands = {
-		'info': createCommand(info, 'Displays information about the connected server'),
-		'chain': createCommand(chain, 'Retrieves the latest starlog'),
-		'probe': createCommand(probe, 'Probes the starlog in the chain', ['Passing no arguments probes for a new starlog ontop of the highest chain member', 'Passing -1 probes for a new genesis starlog', 'Passing a valid starlog height probes for starlogs on top of that memeber of the chain'])
+		'info': createCommand(
+			info, 
+			'Displays information about the connected server'
+		),
+		'chain': createCommand(
+			chain, 
+			'Retrieves the latest starlog'
+		),
+		'probe': createCommand(
+			probe, 
+			'Probes the starlog in the chain', 
+			[
+				'Passing no arguments probes for a new starlog ontop of the highest chain member', 
+				'Passing "-1" probes for a new genesis starlog', 
+				'Passing a valid starlog height probes for starlogs on top of that memeber of the chain'
+			]
+		),
+		'account': createCommand(
+			account,
+			'Information about the current account',
+			[
+				'Passing no arguments gets the current account information',
+				'Passing "all" lists all accounts stored in persistent data',
+				'Passing "set" followed by an account name changes the current account to the specified one'
+			]
+		)
 	}
-
+	
 	exited = False
+	
+	persistentData = loadPersistent()
+
+	if not persistentData:
+		print 'A persistent data file must be created in this directory to continue, would you like to do that now?'
+		command = raw_input('(y / n) > ')
+		if command == 'y' or command == 'yes':
+			persistentData = generatePersistent()
+			savePersistent(persistentData)
+			print 'Generated a new %s file with a new RSA key'
+		else:
+			exited = True
+	
 	while not exited:
 		command = raw_input('> ')
 		try:
@@ -192,7 +329,6 @@ if __name__ == '__main__':
 				if commandName == 'help':
 					commandHelp(allCommands, commandArgs)
 				elif commandName == 'exit':
-					print 'Exiting...'
 					exited = True
 				else:
 					print 'No command "%s" found, try typing help for more commands' % command
@@ -204,3 +340,4 @@ if __name__ == '__main__':
 		except:
 			traceback.print_exc()
 			print 'Error with your last command'	
+	print 'Exiting...'

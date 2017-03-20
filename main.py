@@ -252,9 +252,9 @@ def generateNextStarLog(height=None):
 		result = getRequest(chainsUrl, {'height': height})
 		if result:
 			starLog = result[0]
-
+	currentAccount = getAccount()
 	starLog['state'] = {
-		'fleet': None,
+		'fleet': util.sha256(currentAccount[1]['public_key']) if currentAccount else None,
 		'jumps': [],
 		'star_systems': []
 	}

@@ -150,10 +150,20 @@ def getAccount(name=None):
 
 def account(params=None):
 	if params:
-		if len(params) == 1:
+		paramCount = len(params)
+		if paramCount == 1:
 			primaryParam = params[0]
 			if primaryParam == 'all':
 				accountAll()
+				return
+			if primaryParam == 'clear':
+				accountClear()
+				return
+		elif paramCount == 2:
+			primaryParam = params[0]
+			secondaryParam = params[1]
+			if primaryParam == 'set':
+				accountSet(secondaryParam)
 				return
 		allParams = ''
 		for param in params:
@@ -183,6 +193,28 @@ def accountAll():
 				activeFlag = '[CURR] ' if currentAccount == key else ''
 				message += entryMessage % (activeFlag, key, currentEntry['private_key'][:16], currentEntry['public_key'][:16])
 	print message
+
+def accountClear():
+	if persistentData:
+		persistentData['current_account'] = None
+		savePersistent(persistentData)
+		print 'Current account is now disabled'
+	else:
+		print 'No account information stored in %s' % persistentFileName
+
+def accountSet(name):
+	if not name:
+		print 'Account can not be set to None, try "account clear"'
+	if persistentData and persistentData['accounts']:
+		if name in persistentData['accounts'].keys():
+			persistentData['current_account'] = name
+			savePersistent(persistentData)
+			print 'Current account is now "%s"' % name
+			return
+		else:
+			print 'Account "%s" cannot be found' % name
+			return
+	print 'No account information stored in %s' % persistentFileName
 
 def info():
 	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration) 
@@ -296,7 +328,8 @@ if __name__ == '__main__':
 			[
 				'Passing no arguments gets the current account information',
 				'Passing "all" lists all accounts stored in persistent data',
-				'Passing "set" followed by an account name changes the current account to the specified one'
+				'Passing "set" followed by an account name changes the current account to the specified one',
+				'Passing "clear" disables any active accounts'
 			]
 		)
 	}

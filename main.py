@@ -18,12 +18,12 @@ difficultyFudge = None
 difficultyInterval = None
 difficultyDuration = None
 difficultyStart = None
+shipReward = None
 util = None
 persistentData = None
 
 def getGenesis():
 	return {
-		'log_header': None,
 		'nonce': 0,
 		'hash': util.emptyTarget,
 		'difficulty': difficultyStart,
@@ -253,6 +253,11 @@ def generateNextStarLog(height=None):
 		if result:
 			starLog = result[0]
 	currentAccount = getAccount()
+	
+	lastFleet = starLog['state']['fleet']
+
+	# util.va
+	
 	starLog['state'] = {
 		'fleet': util.sha256(currentAccount[1]['public_key']) if currentAccount else None,
 		'jumps': [],
@@ -294,15 +299,17 @@ if __name__ == '__main__':
 	difficultyInterval = rules['difficulty_interval']
 	difficultyDuration = rules['difficulty_duration']
 	difficultyStart = rules['difficulty_start']
+	shipReward = rules['ship_reward']
 
 	os.environ['DIFFICULTY_FUDGE'] = str(difficultyFudge)
 	os.environ['DIFFICULTY_INTERVAL'] = str(difficultyInterval)
 	os.environ['DIFFICULTY_DURATION'] = str(difficultyDuration)
 	os.environ['DIFFICULTY_START'] = str(difficultyStart)
+	os.environ['SHIP_REWARD'] = str(shipReward)
 
 	import util as util
 
-	print 'Connected to %s with fudge %s, interval %s, duration %s, starting difficulty %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart)
+	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart, shipReward)
 	
 	allCommands = {
 		'info': createCommand(

@@ -14,6 +14,7 @@ difficultyFudge = int(os.getenv('DIFFICULTY_FUDGE', '0'))
 difficultyInterval = int(os.getenv('DIFFICULTY_INTERVAL', '7560'))
 difficultyDuration = int(os.getenv('DIFFICULTY_DURATION', '1209600'))
 difficultyStart = int(os.getenv('DIFFICULTY_START', '486604799'))
+shipReward = int(os.getenv('SHIP_REWARD', '10'))
 maximumTarget = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
 emptyTarget = '0000000000000000000000000000000000000000000000000000000000000000'
 

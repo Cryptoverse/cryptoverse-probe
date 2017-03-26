@@ -64,23 +64,23 @@ def generateAccount():
 	privateSerialized = privateKey.private_bytes(
 		encoding=serialization.Encoding.PEM,
 		format=serialization.PrivateFormat.PKCS8,
-		encryption_algorithm=serialization.BestAvailableEncryption(b'mypassword')
+		encryption_algorithm=serialization.NoEncryption()
 	)
 	publicSerialized = privateKey.public_key().public_bytes(
 		encoding=serialization.Encoding.PEM,
 		format=serialization.PublicFormat.SubjectPublicKeyInfo
 	)
-	privateLines = privateSerialized.splitlines()
-	privateShrunk = ''
-	for line in range(1, len(privateLines) - 1):
-		privateShrunk += privateLines[line].strip('\n')
+	# privateLines = privateSerialized.splitlines()
+	# privateShrunk = ''
+	# for line in range(0, len(privateLines)):
+	# 	privateShrunk += privateLines[line].strip('\n')
 	publicLines = publicSerialized.splitlines()
 	publicShrunk = ''
 	for line in range(1, len(publicLines) - 1):
 		publicShrunk += publicLines[line].strip('\n')
 	
 	return {
-		'private_key': privateShrunk,
+		'private_key': privateSerialized,
 		'public_key': publicShrunk
 	}
 
@@ -252,14 +252,30 @@ def generateNextStarLog(height=None):
 		result = getRequest(chainsUrl, {'height': height})
 		if result:
 			starLog = result[0]
-	currentAccount = getAccount()
+	accountName, accountInfo = getAccount()
 	
 	lastFleet = starLog['state']['fleet']
 
-	# util.va
-	
+	rewardJump = {
+		'fleet_hash': util.sha256(accountInfo['public_key']),
+		'fleet_key': accountInfo['public_key'],
+		'key': util.sha256('%s%s' % (util.getTime(), accountInfo['public_key'])),
+		'origin': None,
+		'destination': None,
+		'count': util.shipReward,
+		'signature': None
+	}
+
+	if not util.isGenesisStarLog(starLog['hash']):
+		firstStarLog = getRequest(chainsUrl, {'height': 0})
+		if firstStarLog:
+			rewardJump['destination'] = firstStarLog[0]['hash']
+	rewardJump['signature'] = util.rsaSign(accountInfo['private_key'], util.sha256(util.concatJump(rewardJump)))
+
+	print rewardJump
+
 	starLog['state'] = {
-		'fleet': util.sha256(currentAccount[1]['public_key']) if currentAccount else None,
+		'fleet': util.sha256(accountInfo['public_key']) if accountInfo else None,
 		'jumps': [],
 		'star_systems': []
 	}
@@ -275,7 +291,12 @@ def generateNextStarLog(height=None):
 	while not found and tries < sys.maxint:
 		starLog['nonce'] += 1
 		starLog = util.hashStarLog(starLog)
-		found = util.verifyDifficulty(int(starLog['difficulty']), starLog['hash'])
+		found = False
+		try:
+			validate.difficulty(int(starLog['difficulty']), starLog['hash'])
+			found = True
+		except:
+			pass
 		now = datetime.now()
 		if 1 < (now - lastCheckin).total_seconds():
 			lastCheckin = now
@@ -308,6 +329,7 @@ if __name__ == '__main__':
 	os.environ['SHIP_REWARD'] = str(shipReward)
 
 	import util as util
+	import validate
 
 	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart, shipReward)
 	

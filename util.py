@@ -1,14 +1,11 @@
 import os
 import hashlib
-import re
 import binascii
-import traceback
 import time
-from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
-from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 difficultyFudge = int(os.getenv('DIFFICULTY_FUDGE', '0'))
 difficultyInterval = int(os.getenv('DIFFICULTY_INTERVAL', '7560'))
@@ -25,7 +22,7 @@ elif 0 < difficultyFudge:
 	suffix = maximumTarget[:difficultyFudge]
 	maximumTarget = prefix + suffix
 
-def isGenesisStarLogParent(sha):
+def isGenesisStarLog(sha):
 	'''Checks if the provided hash could only belong to the parent of the genesis star log.
 
 	Args:
@@ -140,17 +137,6 @@ def calculateDifficulty(difficulty, duration):
 	
 	return difficultyFromHex(difficultyFromTarget(hex(result)[2:]))
 
-def verifyFieldIsSha256(sha):
-	'''Verifies a string is a possible Sha256 hash.
-
-	Args:
-		sha (str): Hash to verify.
-
-	Returns:
-		bool: True for success, False otherwise.
-	'''
-	return re.match(r'^[A-Fa-f0-9]{64}$', sha)
-
 def concatStarLogHeader(starLog):
 	'''Concats the header information from the provided json.
 	
@@ -162,29 +148,6 @@ def concatStarLogHeader(starLog):
 	'''
 	return '%s%s%s%s%s%s' % (starLog['version'], starLog['previous_hash'], starLog['difficulty'], starLog['nonce'], starLog['time'], starLog['state_hash'])
 
-def verifyLogHeader(starLog):
-	'''Verifies the header of this log matches the provided one.
-
-	Args:
-		starLog (dict): Target.
-
-	Returns:
-		bool: True if there is a match, False otherwise.
-	'''
-	return starLog['log_header'] == concatStarLogHeader(starLog)
-
-def verifySha256(sha, message):
-	'''Verifies the hash matches the Sha256'd message.
-
-	Args:
-		sha (str): A Sha256 hash result.
-		message (str): Message to hash and compare to.
-	
-	Returns:
-		bool: True if the hash matches the hashed message, False otherwies.
-	'''
-	return sha == sha256(message)
-
 def concatJump(jump):
 	'''Concats the information of a jump from the provided json.
 
@@ -194,18 +157,7 @@ def concatJump(jump):
 	Returns:
 		str: Resulting concat'd information of the jump.
 	'''
-	return '%s%s%s%s%s'%(jump['fleet'], jump['key'], jump['origin'], jump['destination'], jump['count'])
-
-def rsaVerifyJump(jump):
-	'''Verifies the Rsa signature of the provided jump json.
-
-	Args:
-		jump (dict): Jump to validate.
-
-	Returns:
-		bool: True if the jump is properly signed, False otherwise.
-	'''
-	return rsaVerify(expandRsaPublicKey(jump['fleet']), jump['signature'], concatJump(jump))
+	return '%s%s%s%s%s'%(jump['fleet_hash'], jump['key'], jump['origin'], jump['destination'], jump['count'])
 
 def expandRsaPublicKey(shrunkPublicKey):
 	'''Reformats a shrunk Rsa public key.
@@ -239,32 +191,6 @@ def rsaSign(privateKey, message):
 		hashes.SHA256()
 	)
 	return binascii.hexlify(bytearray(signature))
-
-def rsaVerify(publicKey, signature, message):
-	'''Verifies an Rsa signature.
-	Args:
-		publicKey (str): Public key with BEGIN and END sections.
-		signature (str): Hex value of the signature with its leading 0x stripped.
-		message (str): Message that was signed, unhashed.
-
-	Returns:
-		bool: True if the signature is valid, False otherwise.
-	'''
-	try:
-		publicRsa = load_pem_public_key(bytes(publicKey), backend=default_backend())
-		hashed = sha256(message)
-		publicRsa.verify(
-			binascii.unhexlify(signature),
-			hashed,
-			padding.PSS(
-				mgf=padding.MGF1(hashes.SHA256()),
-				salt_length=padding.PSS.MAX_LENGTH
-			),
-			hashes.SHA256()
-		)
-		return True
-	except InvalidSignature:
-		return False
 
 def hashStarLog(starLog):
 	'''Hashed value of the provided star log's header.
@@ -340,29 +266,6 @@ def unpackBits(difficulty):
 	if 0 < difficultyFudge:
 		base256 = base256[difficultyFudge:] + base256[:difficultyFudge]
 	return base256
-
-def verifyDifficulty(difficulty, sha):
-	'''Takes the integer form of difficulty and verifies that the hash is less than it.
-
-	Args:
-		difficulty (int): Difficulty the provided Sha256 hash must meet.
-		sha (str): Hex target to test, stripped of its leading 0x.
-
-	Returns:
-		bool: True if the provided Sha256 hash is less than target specified by the difficulty.
-	'''
-	if not isinstance(difficulty, (int, long)):
-		raise TypeError('difficulty is not an int')
-	if not verifyFieldIsSha256(sha):
-		raise ValueError('hash is invalid')
-
-	mask = unpackBits(difficulty).rstrip('0')
-	significant = sha[:len(mask)]
-	try:
-		return int(significant, 16) < int(mask, 16)
-	except:
-		traceback.print_exc()
-		return False
 
 def getTime():
 	'''UTC time in seconds.

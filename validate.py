@@ -54,10 +54,10 @@ def sha256(sha, message, name=None):
 		raise Exception('Sha256 does not match message' if name is None else 'Sha256 of %s does not match hash' % name)
 
 def starLog(starLogJson):
-	'''Verifies the star log has all the required fields, and any hashes and signatures match up.
+	'''Verifies the starlog has all the required fields, and any hashes and signatures match up.
 
 	Args:
-		target (dict): Target starlog json.
+		starLogJson (dict): Target starlog json.
 	'''
 	if not isinstance(starLogJson['hash'], basestring):
 		raise Exception('hash is not a string')
@@ -77,10 +77,6 @@ def starLog(starLogJson):
 		raise Exception('state_hash is not a string')
 	if starLogJson['state'] is None:
 		raise Exception('state is missing')
-	if starLogJson['state']['fleet']:
-		if not isinstance(starLogJson['state']['fleet'], basestring):
-			raise Exception('state.fleet is not a string')
-		fieldIsSha256(starLogJson['state']['fleet'], 'state.fleet')
 	
 	fieldIsSha256(starLogJson['hash'], 'hash')
 	fieldIsSha256(starLogJson['previous_hash'], 'previous_hash')
@@ -89,32 +85,100 @@ def starLog(starLogJson):
 	if not starLogJson['state_hash'] == util.hashState(starLogJson['state']):
 		raise Exception('state_hash does not match actual hash')
 	difficulty(starLogJson['difficulty'], starLogJson['hash'])
+	state(starLogJson['state'])
 
-def previousJump(previousFleet, jumpJson):
-	'''Verifies the fields of a previous jump, included with a starlog by the prober.
+def state(stateJson):
+	'''Verifies the state of a star log has all the required fields, and any hashes and signatures match up.
+
+	Args:
+		stateJson (dict): State json.
+	'''
+	remainingShipRewards = util.shipReward
+	jumpKeys = []
+	for currentJump in stateJson['jumps']:
+		jump(currentJump)
+		if currentJump['origin'] is None:
+			remainingShipRewards -= currentJump['count']
+			if remainingShipRewards < 0:
+				raise ValueError('number of ships rewarded is out of range')
+		key = currentJump['key']
+		if key in jumpKeys:
+			raise ValueError('jump key "%s" is listed more than once' % key)
+		jumpKeys.append(key)
+	
+	systemHashes = []
+	for currentSystem in stateJson['star_systems']:
+		starSystem(currentSystem)
+		systemHash = currentSystem['hash']
+		if systemHash in systemHashes:
+			raise ValueError('system hash "%s" is listed more than once' % systemHash)
+		systemHashes.append(systemHash)
+
+def jump(jumpJson):
+	'''Verifies the fields of a jump.
 
 	Args:
 		jumpJson (dict): Target.
 	'''
-	if previousFleet is None:
-		raise ValueError('previousFleet is missing')
-	if jumpJson is None:
-		raise ValueError('jumpJson is missing')
-	if previousFleet.hash is None:
-		raise ValueError('previousFleet.hash is missing')
-	if jumpJson['fleet_hash'] is None:
-		raise ValueError('jumpJson.fleet_hash is missing')
-	if previousFleet.hash != jumpJson['fleet_hash']:
-		raise ValueError('previousFleet.hash and jumpJson.fleet_hash do not match')
+	# rewardJump = {
+	# 	'fleet_hash': util.sha256(accountInfo['public_key']),
+	# 	'fleet_key': accountInfo['public_key'],
+	# 	'key': util.sha256('%s%s' % (util.getTime(), accountInfo['public_key'])),
+	# 	'origin': None,
+	# 	'destination': None,
+	# 	'count': util.shipReward,
+	# 	'lost_count': 0,
+	# 	'signature': None
+	# }
+	if not isinstance(jumpJson['fleet_hash'], basestring):
+		raise Exception('fleet_hash is not a string')
+	if not isinstance(jumpJson['fleet_key'], basestring):
+		raise Exception('fleet_key is not a string')
+	if not isinstance(jumpJson['key'], basestring):
+		raise Exception('key is not a string')
+	if not isinstance(jumpJson['count'], int):
+		raise Exception('count is not a integer')
+	if not isinstance(jumpJson['lost_count'], int):
+		raise Exception('lost_count is not a integer')
+	if not isinstance(jumpJson['signature'], basestring):
+		raise Exception('signature is not a string')
 	
+	if jumpJson['count'] <= 0:
+		raise ValueError('count cannot be equal to or less than zero')
+	if jumpJson['lost_count'] < 0:
+		raise ValueError('lost_count cannot be less than zero')
+	if jumpJson['count'] <= jumpJson['lost_count']:
+		raise ValueError('count cannot be equal to or less than lost_count')
 
-def jumpRsa(jump):
+	if isinstance(jumpJson['destination'], basestring):
+		fieldIsSha256(jumpJson['destination'], 'destination')
+	if isinstance(jumpJson['origin'], basestring):
+		fieldIsSha256(jumpJson['origin'], 'origin')
+		lostCount(jumpJson['count'], jumpJson['lost_count'], jumpJson['origin'], jumpJson['destination'])
+
+	fieldIsSha256(jumpJson['key'], 'key')
+	sha256(jumpJson['fleet_hash'], jumpJson['fleet_key'], 'fleet_hash')
+
+	jumpRsa(jumpJson)
+
+def starSystem(starSystemJson):
+	'''Verifies the fields of a star system.
+
+	Args:
+		starSystemJson (dict): Target.
+	'''
+	# TODO: Validation of star systems.
+	pass
+
+def jumpRsa(jumpJson):
 	'''Verifies the Rsa signature of the provided jump json.
 
 	Args:
 		jump (dict): Jump to validate.
 	'''
-	if not rsa(util.expandRsaPublicKey(jump['fleet_key']), jump['signature'], util.concatJump(jump)):
+	try:
+		rsa(util.expandRsaPublicKey(jumpJson['fleet_key']), jumpJson['signature'], util.concatJump(jumpJson))
+	except InvalidSignature:
 		raise Exception('Invalid RSA signature')
 
 def difficulty(packed, sha):
@@ -136,3 +200,7 @@ def difficulty(packed, sha):
 			raise Exception('Hash is greater than packed target')
 	except:
 		raise Exception('Unable to cast to int from hexidecimal')
+
+def lostCount(count, lostCount, originHash, destinationHash):
+	# TODO: check the lost count is correct
+	pass

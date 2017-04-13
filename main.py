@@ -254,8 +254,6 @@ def generateNextStarLog(height=None):
 			starLog = result[0]
 	accountName, accountInfo = getAccount()
 	
-	lastFleet = starLog['state']['fleet']
-
 	rewardJump = {
 		'fleet_hash': util.sha256(accountInfo['public_key']),
 		'fleet_key': accountInfo['public_key'],
@@ -263,6 +261,7 @@ def generateNextStarLog(height=None):
 		'origin': None,
 		'destination': None,
 		'count': util.shipReward,
+		'lost_count': 0,
 		'signature': None
 	}
 
@@ -270,13 +269,12 @@ def generateNextStarLog(height=None):
 		firstStarLog = getRequest(chainsUrl, {'height': 0})
 		if firstStarLog:
 			rewardJump['destination'] = firstStarLog[0]['hash']
-	rewardJump['signature'] = util.rsaSign(accountInfo['private_key'], util.sha256(util.concatJump(rewardJump)))
-
-	print rewardJump
+	rewardJump['signature'] = util.rsaSign(accountInfo['private_key'], util.concatJump(rewardJump))
 
 	starLog['state'] = {
-		'fleet': util.sha256(accountInfo['public_key']) if accountInfo else None,
-		'jumps': [],
+		'jumps': [
+			rewardJump
+		],
 		'star_systems': []
 	}
 	starLog['previous_hash'] = starLog['hash']

@@ -215,7 +215,7 @@ def hashState(state):
 	Returns:
 		str: Sha256 hash of the provided state.
 	'''
-	concat = state['fleet']
+	concat = ''
 	for jump in state['jumps']:
 		concat += jump['signature']
 	for starSystem in state['star_systems']:
@@ -266,6 +266,25 @@ def unpackBits(difficulty):
 	if 0 < difficultyFudge:
 		base256 = base256[difficultyFudge:] + base256[:difficultyFudge]
 	return base256
+
+def getFleets(stateJson):
+	'''Gets all the unique fleets list in a state.
+
+	Args:
+		stateJson (dict): State json.
+	
+	Returns:
+		tuple[]: The fleet's hash and public key.
+	'''
+	fleetHashes = []
+	results = []
+	for jump in stateJson['jumps']:
+		fleetHash = jump['fleet_hash']
+		if fleetHash in fleetHashes:
+			continue
+		fleetHashes.append(fleetHash)
+		results.append((fleetHash, jump['fleet_key']))
+	return results
 
 def getTime():
 	'''UTC time in seconds.

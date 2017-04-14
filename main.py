@@ -265,17 +265,19 @@ def generateNextStarLog(height=None):
 		'signature': None
 	}
 
+	starSystems = []
+
 	if not util.isGenesisStarLog(starLog['hash']):
 		firstStarLog = getRequest(chainsUrl, {'height': 0})
-		if firstStarLog:
-			rewardJump['destination'] = firstStarLog[0]['hash']
+		# Until we have a way to select where to send your reward ships, just send them to the genesis block.
+		rewardJump['destination'] = firstStarLog[0]['hash']
 	rewardJump['signature'] = util.rsaSign(accountInfo['private_key'], util.concatJump(rewardJump))
 
 	starLog['state'] = {
 		'jumps': [
 			rewardJump
 		],
-		'star_systems': []
+		'star_systems': starSystems
 	}
 	starLog['previous_hash'] = starLog['hash']
 	starLog['time'] = util.getTime()

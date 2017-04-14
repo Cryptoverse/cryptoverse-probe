@@ -268,7 +268,7 @@ def unpackBits(difficulty):
 	return base256
 
 def getFleets(stateJson):
-	'''Gets all the unique fleets list in a state.
+	'''Gets all the unique fleets in a state.
 
 	Args:
 		stateJson (dict): State json.
@@ -284,6 +284,20 @@ def getFleets(stateJson):
 			continue
 		fleetHashes.append(fleetHash)
 		results.append((fleetHash, jump['fleet_key']))
+	return results
+
+def getSystems(stateJson):
+	'''Gets all the unique star systems in a state.
+
+	Args:
+		stateJson (dict): State json.
+	
+	Returns:
+		str[]: The list of star systems.
+	'''
+	results = []
+	for system in stateJson['star_systems']:
+		results.append(system['hash'])
 	return results
 
 def getTime():

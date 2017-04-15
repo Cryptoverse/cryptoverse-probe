@@ -146,18 +146,25 @@ def concatStarLogHeader(starLog):
 	Returns:
 		str: Resulting header.
 	'''
-	return '%s%s%s%s%s%s' % (starLog['version'], starLog['previous_hash'], starLog['difficulty'], starLog['nonce'], starLog['time'], starLog['state_hash'])
+	return '%s%s%s%s%s%s' % (starLog['version'], starLog['previous_hash'], starLog['difficulty'], starLog['nonce'], starLog['time'], starLog['events_hash'])
 
-def concatJump(jump):
-	'''Concats the information of a jump from the provided json.
+def concatEvent(eventJson):
+	'''Concats the information of an event from the provided json.
 
 	Args:
-		jump (dict): Jump to pull the information from.
+		eventJson (dict): Event to pull the information from.
 
 	Returns:
-		str: Resulting concat'd information of the jump.
+		str: Resulting concatenated information of the event.
 	'''
-	return '%s%s%s%s%s'%(jump['fleet_hash'], jump['key'], jump['origin'], jump['destination'], jump['count'])
+	concat = eventJson['fleet_hash']
+	for currentInput in eventJson['inputs']:
+		concat += '%s%s%s%s%s' % (currentInput['type'], currentInput['fleet_hash'], currentInput['key'], currentInput['destination'], currentInput['count'])
+	# TODO: Remove duplicate code.
+	for currentInput in eventJson['outputs']:
+		concat += '%s%s%s%s%s' % (currentInput['type'], currentInput['fleet_hash'], currentInput['key'], currentInput['destination'], currentInput['count'])
+	
+	return concat
 
 def expandRsaPublicKey(shrunkPublicKey):
 	'''Reformats a shrunk Rsa public key.
@@ -199,30 +206,25 @@ def hashStarLog(starLog):
 		starLog (dict): Json data for the star log to be hashed.
 	
 	Returns:
-		str: Supplied star log with its `state_hash`, `log_header`, and `hash` fields calculated.
+		str: Supplied star log with its `events_hash`, `log_header`, and `hash` fields calculated.
 	'''
-	starLog['state_hash'] = hashState(starLog['state'])
+	starLog['events_hash'] = hashEvents(starLog['events'])
 	starLog['log_header'] = concatStarLogHeader(starLog)
 	starLog['hash'] = sha256(starLog['log_header'])
 	return starLog
 
-def hashState(state):
-	'''Hashed value of the provided state.
+def hashEvents(events):
+	'''Hashed value of the provided events.
 
 	Args:
-		state (dict): Json data for the state to be hashed.
+		events (dict): Json data for the events to be hashed.
 
 	Returns:
-		str: Sha256 hash of the provided state.
+		str: Sha256 hash of the provided events.
 	'''
 	concat = ''
-	for jump in state['jumps']:
-		concat += jump['signature']
-	for starSystem in state['star_systems']:
-		concat += starSystem['hash']
-		for deployment in starSystem['deployments']:
-			concat += deployment['fleet']
-			concat += str(deployment['count'])
+	for event in events:
+		concat += concatEvent(event)
 	return sha256(concat)
 
 def unpackBits(difficulty):
@@ -267,37 +269,24 @@ def unpackBits(difficulty):
 		base256 = base256[difficultyFudge:] + base256[:difficultyFudge]
 	return base256
 
-def getFleets(stateJson):
-	'''Gets all the unique fleets in a state.
+def getFleets(eventsJson):
+	'''Gets all fleets with their keys.
 
 	Args:
-		stateJson (dict): State json.
+		eventsJson (dict): List of all events to check.
 	
 	Returns:
-		tuple[]: The fleet's hash and public key.
+		list: A list of tuples with fleet hashes and their key.
 	'''
-	fleetHashes = []
 	results = []
-	for jump in stateJson['jumps']:
-		fleetHash = jump['fleet_hash']
-		if fleetHash in fleetHashes:
+	for currentEvent in eventsJson:
+		if currentEvent['type'] != 'reward':
 			continue
-		fleetHashes.append(fleetHash)
-		results.append((fleetHash, jump['fleet_key']))
-	return results
-
-def getSystems(stateJson):
-	'''Gets all the unique star systems in a state.
-
-	Args:
-		stateJson (dict): State json.
-	
-	Returns:
-		str[]: The list of star systems.
-	'''
-	results = []
-	for system in stateJson['star_systems']:
-		results.append(system['hash'])
+		fleetHash = currentEvent['fleet_hash']
+		fleetKey = currentEvent['fleet_key']
+		if None in (fleetHash, fleetKey):
+			continue
+		results.append((fleetHash, fleetKey))
 	return results
 
 def getTime():

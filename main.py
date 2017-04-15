@@ -27,15 +27,11 @@ def getGenesis():
 		'nonce': 0,
 		'hash': util.emptyTarget,
 		'difficulty': difficultyStart,
-		'state': {
-			'fleet': None,
-			'jumps': [],
-			'star_systems': []
-		},
+		'events': [],
 		'version': 0,
 		'time': 0,
 		'previous_hash': util.emptyTarget,
-		'state_hash': None
+		'events_hash': None
 	}
 
 def loadPersistent():
@@ -252,33 +248,35 @@ def generateNextStarLog(height=None):
 		result = getRequest(chainsUrl, {'height': height})
 		if result:
 			starLog = result[0]
-	accountName, accountInfo = getAccount()
+	accountInfo = getAccount()[1]
 	
-	rewardJump = {
+	rewardOutput = {
+		'type': 'result',
 		'fleet_hash': util.sha256(accountInfo['public_key']),
-		'fleet_key': accountInfo['public_key'],
 		'key': util.sha256('%s%s' % (util.getTime(), accountInfo['public_key'])),
-		'origin': None,
 		'destination': None,
 		'count': util.shipReward,
-		'lost_count': 0,
-		'signature': None
 	}
 
-	starSystems = []
+	rewardEvent = {
+		'type': 'reward',
+		'fleet_hash': util.sha256(accountInfo['public_key']),
+		'fleet_key': accountInfo['public_key'],
+		'inputs': [],
+		'outputs': [
+			rewardOutput
+		],
+		'signature': None
+	}
 
 	if not util.isGenesisStarLog(starLog['hash']):
 		firstStarLog = getRequest(chainsUrl, {'height': 0})
 		# Until we have a way to select where to send your reward ships, just send them to the genesis block.
-		rewardJump['destination'] = firstStarLog[0]['hash']
-	rewardJump['signature'] = util.rsaSign(accountInfo['private_key'], util.concatJump(rewardJump))
+		rewardOutput['destination'] = firstStarLog[0]['hash']
 
-	starLog['state'] = {
-		'jumps': [
-			rewardJump
-		],
-		'star_systems': starSystems
-	}
+	rewardEvent['signature'] = util.rsaSign(accountInfo['private_key'], util.concatEvent(rewardEvent))
+
+	starLog['events'] = [ rewardEvent ]
 	starLog['previous_hash'] = starLog['hash']
 	starLog['time'] = util.getTime()
 	starLog['nonce'] = 0

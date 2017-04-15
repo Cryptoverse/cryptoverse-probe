@@ -73,93 +73,80 @@ def starLog(starLogJson):
 		raise Exception('time is not an integer')
 	if util.getTime() < starLogJson['time']:
 		raise Exception('time is greater than the current time')
-	if not isinstance(starLogJson['state_hash'], basestring):
-		raise Exception('state_hash is not a string')
-	if starLogJson['state'] is None:
-		raise Exception('state is missing')
+	if not isinstance(starLogJson['events_hash'], basestring):
+		raise Exception('events_hash is not a string')
+	if starLogJson['events'] is None:
+		raise Exception('events is missing')
 	
 	fieldIsSha256(starLogJson['hash'], 'hash')
 	fieldIsSha256(starLogJson['previous_hash'], 'previous_hash')
-	fieldIsSha256(starLogJson['state_hash'], 'state_hash')
+	fieldIsSha256(starLogJson['events_hash'], 'events_hash')
 	sha256(starLogJson['hash'], util.concatStarLogHeader(starLogJson), 'log_header')
-	if not starLogJson['state_hash'] == util.hashState(starLogJson['state']):
-		raise Exception('state_hash does not match actual hash')
+	if not starLogJson['events_hash'] == util.hashEvents(starLogJson['events']):
+		raise Exception('events_hash does not match actual hash')
 	difficulty(starLogJson['difficulty'], starLogJson['hash'])
-	state(starLogJson['state'])
+	events(starLogJson['events'])
 
-def state(stateJson):
+def events(eventsJson):
 	'''Verifies the state of a star log has all the required fields, and any hashes and signatures match up.
 
 	Args:
 		stateJson (dict): State json.
 	'''
 	remainingShipRewards = util.shipReward
-	jumpKeys = []
-	for currentJump in stateJson['jumps']:
-		jump(currentJump)
-		if currentJump['origin'] is None:
-			remainingShipRewards -= currentJump['count']
-			if remainingShipRewards < 0:
-				raise ValueError('number of ships rewarded is out of range')
-		key = currentJump['key']
-		if key in jumpKeys:
-			raise ValueError('jump key "%s" is listed more than once' % key)
-		jumpKeys.append(key)
-	
-	systemHashes = []
-	for currentSystem in stateJson['star_systems']:
-		starSystem(currentSystem)
-		systemHash = currentSystem['hash']
-		if systemHash in systemHashes:
-			raise ValueError('system hash "%s" is listed more than once' % systemHash)
-		systemHashes.append(systemHash)
+	inputKeys = []
+	for currentEvent in eventsJson:
+		event(currentEvent)
+		if currentEvent['type'] == 'reward':
+			for currentOutput in currentEvent['outputs']:
+				remainingShipRewards -= currentOutput['count']
+				if remainingShipRewards < 0:
+					raise ValueError('number of ships rewarded is out of range')
+		else:
+			raise ValueError('unrecognized event of type %s' % currentEvent['type'])
+		
+		for currentInput in currentEvent['inputs']:
+			key = currentInput['key']
+			if key in inputKeys:
+				raise ValueError('event key %s is listed more than once' % key)
+			inputKeys.append(key)
 
-def jump(jumpJson):
-	'''Verifies the fields of a jump.
+def event(eventJson):
+	'''Verifies the fields of an event.
 
 	Args:
-		jumpJson (dict): Target.
+		eventJson (dict): Target.
 	'''
-	# rewardJump = {
-	# 	'fleet_hash': util.sha256(accountInfo['public_key']),
-	# 	'fleet_key': accountInfo['public_key'],
-	# 	'key': util.sha256('%s%s' % (util.getTime(), accountInfo['public_key'])),
-	# 	'origin': None,
-	# 	'destination': None,
-	# 	'count': util.shipReward,
-	# 	'lost_count': 0,
-	# 	'signature': None
-	# }
-	if not isinstance(jumpJson['fleet_hash'], basestring):
+	if not isinstance(eventJson['type'], basestring):
+		raise Exception('type is not a string')
+	if not isinstance(eventJson['fleet_hash'], basestring):
 		raise Exception('fleet_hash is not a string')
-	if not isinstance(jumpJson['fleet_key'], basestring):
-		raise Exception('fleet_key is not a string')
-	if not isinstance(jumpJson['key'], basestring):
-		raise Exception('key is not a string')
-	if not isinstance(jumpJson['count'], int):
-		raise Exception('count is not a integer')
-	if not isinstance(jumpJson['lost_count'], int):
-		raise Exception('lost_count is not a integer')
-	if not isinstance(jumpJson['signature'], basestring):
-		raise Exception('signature is not a string')
 	
-	if jumpJson['count'] <= 0:
-		raise ValueError('count cannot be equal to or less than zero')
-	if jumpJson['lost_count'] < 0:
-		raise ValueError('lost_count cannot be less than zero')
-	if jumpJson['count'] <= jumpJson['lost_count']:
-		raise ValueError('count cannot be equal to or less than lost_count')
-
-	if isinstance(jumpJson['destination'], basestring):
-		fieldIsSha256(jumpJson['destination'], 'destination')
-	if isinstance(jumpJson['origin'], basestring):
-		fieldIsSha256(jumpJson['origin'], 'origin')
-		lostCount(jumpJson['count'], jumpJson['lost_count'], jumpJson['origin'], jumpJson['destination'])
-
-	fieldIsSha256(jumpJson['key'], 'key')
-	sha256(jumpJson['fleet_hash'], jumpJson['fleet_key'], 'fleet_hash')
-
-	jumpRsa(jumpJson)
+	eventType = eventJson['type']
+	
+	if eventType == 'reward':
+		if not isinstance(eventJson['fleet_key'], basestring):
+			raise Exception('fleet_key is not a string')
+		if not isinstance(eventJson['signature'], basestring):
+			raise Exception('signature is not a string')
+		if eventJson['outputs'] is None:
+			raise Exception('outputs is missing')
+		sha256(eventJson['fleet_hash'], eventJson['fleet_key'], 'fleet_hash')
+		remainingShipRewards = util.shipReward
+		for currentOutput in eventJson['outputs']:
+				remainingShipRewards -= currentOutput['count']
+				if remainingShipRewards < 0:
+					raise ValueError('number of ships rewarded is out of range')
+		eventRsa(eventJson)
+	elif eventType == 'result':
+		if not isinstance(eventJson['key'], basestring):
+			raise Exception('key is not a string')
+		if not isinstance(eventJson['count'], int):
+			raise Exception('count is not an integer')
+		if eventJson['count'] <= 0:
+			raise Exception('count is out of range')
+	else:
+		raise Exception('unrecognized event of type %s' % eventType)
 
 def starSystem(starSystemJson):
 	'''Verifies the fields of a star system.
@@ -170,14 +157,14 @@ def starSystem(starSystemJson):
 	# TODO: Validation of star systems.
 	pass
 
-def jumpRsa(jumpJson):
-	'''Verifies the Rsa signature of the provided jump json.
+def eventRsa(eventJson):
+	'''Verifies the Rsa signature of the provided event json.
 
 	Args:
-		jump (dict): Jump to validate.
+		eventJson (dict): Event to validate.
 	'''
 	try:
-		rsa(util.expandRsaPublicKey(jumpJson['fleet_key']), jumpJson['signature'], util.concatJump(jumpJson))
+		rsa(util.expandRsaPublicKey(eventJson['fleet_key']), eventJson['signature'], util.concatEvent(eventJson))
 	except InvalidSignature:
 		raise Exception('Invalid RSA signature')
 

@@ -148,15 +148,6 @@ def event(eventJson):
 	else:
 		raise Exception('unrecognized event of type %s' % eventType)
 
-def starSystem(starSystemJson):
-	'''Verifies the fields of a star system.
-
-	Args:
-		starSystemJson (dict): Target.
-	'''
-	# TODO: Validation of star systems.
-	pass
-
 def eventRsa(eventJson):
 	'''Verifies the Rsa signature of the provided event json.
 

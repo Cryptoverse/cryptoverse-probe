@@ -15,6 +15,13 @@ shipReward = int(os.getenv('SHIP_REWARD', '10'))
 maximumTarget = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
 emptyTarget = '0000000000000000000000000000000000000000000000000000000000000000'
 
+eventTypes = [
+	'unknown',
+	'reward',
+	'jump',
+	'attack'
+]
+
 if not 0 <= difficultyFudge <= 8:
 	raise ValueError('DIFFICULTY_FUDGE must be a value from 0 to 8 (inclusive)')
 elif 0 < difficultyFudge:
@@ -159,10 +166,10 @@ def concatEvent(eventJson):
 	'''
 	concat = eventJson['fleet_hash']
 	for currentInput in eventJson['inputs']:
-		concat += '%s%s%s%s%s' % (currentInput['type'], currentInput['fleet_hash'], currentInput['key'], currentInput['destination'], currentInput['count'])
+		concat += '%s%s%s%s%s' % (currentInput['type'], currentInput['fleet_hash'], currentInput['key'], currentInput['star_system'], currentInput['count'])
 	# TODO: Remove duplicate code.
 	for currentInput in eventJson['outputs']:
-		concat += '%s%s%s%s%s' % (currentInput['type'], currentInput['fleet_hash'], currentInput['key'], currentInput['destination'], currentInput['count'])
+		concat += '%s%s%s%s%s' % (currentInput['type'], currentInput['fleet_hash'], currentInput['key'], currentInput['star_system'], currentInput['count'])
 	
 	return concat
 
@@ -288,6 +295,46 @@ def getFleets(eventsJson):
 			continue
 		results.append((fleetHash, fleetKey))
 	return results
+
+def getEventOutputs(eventsJson):
+	'''Gets all output events.
+
+	Args:
+		eventsJson (dict): List of all events to search.
+	
+	Returns:
+		list: A list the input events.
+	'''
+	results = []
+	for currentEvent in eventsJson:
+		for currentOutput in currentEvent['outputs']:
+			results.append(currentOutput)
+	return results
+
+def getEventTypeId(eventName):
+	'''Gets the integer associated with the event type.
+
+	Args:
+		eventName (str): Name of the event.
+	
+	Returns:
+		int: Integer of the event type.
+	'''
+	for i in range(0, len(eventTypes)):
+		if eventTypes[i] == eventName:
+			return i
+	return 0
+
+def getEventTypeName(eventId):
+	'''Gets the str name associated with the event type.
+
+	Args:
+		eventId (int): Id of the event.
+	
+	Returns:
+		str: Str of the event type.
+	'''
+	return eventTypes[eventId] if eventId < len(eventTypes) else eventTypes[0]
 
 def getTime():
 	'''UTC time in seconds.

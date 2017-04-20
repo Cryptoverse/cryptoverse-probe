@@ -251,6 +251,7 @@ def generateNextStarLog(height=None):
 	accountInfo = getAccount()[1]
 	
 	rewardOutput = {
+		'index': 0,
 		'type': 'reward',
 		'fleet_hash': util.sha256(accountInfo['public_key']),
 		'key': util.sha256('%s%s' % (util.getTime(), accountInfo['public_key'])),
@@ -259,6 +260,7 @@ def generateNextStarLog(height=None):
 	}
 
 	rewardEvent = {
+		'hash': None,
 		'type': 'reward',
 		'fleet_hash': util.sha256(accountInfo['public_key']),
 		'fleet_key': accountInfo['public_key'],
@@ -274,7 +276,8 @@ def generateNextStarLog(height=None):
 		# Until we have a way to select where to send your reward ships, just send them to the genesis block.
 		rewardOutput['star_system'] = firstStarLog[0]['hash']
 
-	rewardEvent['signature'] = util.rsaSign(accountInfo['private_key'], util.concatEvent(rewardEvent))
+	rewardEvent['hash'] = util.hashEvent(rewardEvent)
+	rewardEvent['signature'] = util.rsaSign(accountInfo['private_key'], rewardEvent['hash'])
 
 	starLog['events'] = [ rewardEvent ]
 	starLog['previous_hash'] = starLog['hash']

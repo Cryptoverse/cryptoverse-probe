@@ -95,9 +95,14 @@ def events(eventsJson):
 	'''
 	remainingShipRewards = util.shipReward
 	inputKeys = []
+	outputKeys = []
 	for currentEvent in eventsJson:
 		event(currentEvent)
 		if currentEvent['type'] == 'reward':
+			if len(currentEvent['inputs']) != 0:
+				raise Exception('reward events cannot have inputs')
+			if len(currentEvent['outputs']) == 0:
+				raise Exception('reward events with no recipients should not be included')
 			for currentOutput in currentEvent['outputs']:
 				remainingShipRewards -= currentOutput['count']
 				if remainingShipRewards < 0:
@@ -108,8 +113,13 @@ def events(eventsJson):
 		for currentInput in currentEvent['inputs']:
 			key = currentInput['key']
 			if key in inputKeys:
-				raise ValueError('event key %s is listed more than once' % key)
+				raise Exception('event input key %s is listed more than once' % key)
 			inputKeys.append(key)
+		for currentOutput in currentEvent['outputs']:
+			key = currentOutput['key']
+			if key in outputKeys:
+				raise Exception('event output key %s is listed more than once' % key)
+			outputKeys.append(key)
 
 def event(eventJson):
 	'''Verifies the fields of an event.
@@ -121,32 +131,68 @@ def event(eventJson):
 		raise Exception('type is not a string')
 	if not isinstance(eventJson['fleet_hash'], basestring):
 		raise Exception('fleet_hash is not a string')
+	if not isinstance(eventJson['fleet_key'], basestring):
+		raise Exception('fleet_key is not a string')
+	if not isinstance(eventJson['hash'], basestring):
+		raise Exception('hash is not a string')
 	
-	eventType = eventJson['type']
+	fieldIsSha256(eventJson['hash'], 'hash')
+
+	if eventJson['type'] not in ['reward']:
+		raise Exception('unrecognized event of type %s' % eventJson['type'])
+
+	inputIndices = []
+	for currentInput in eventJson['inputs']:
+		eventInput(currentInput)
+		inputIndex = currentInput['index']
+		if inputIndex in inputIndices:
+			raise Exception('duplicate input index %s' % inputIndex)
+		inputIndices.append(inputIndex)
 	
-	if eventType == 'reward':
-		if not isinstance(eventJson['fleet_key'], basestring):
-			raise Exception('fleet_key is not a string')
-		if not isinstance(eventJson['signature'], basestring):
-			raise Exception('signature is not a string')
-		if eventJson['outputs'] is None:
-			raise Exception('outputs is missing')
-		sha256(eventJson['fleet_hash'], eventJson['fleet_key'], 'fleet_hash')
-		remainingShipRewards = util.shipReward
-		for currentOutput in eventJson['outputs']:
-				remainingShipRewards -= currentOutput['count']
-				if remainingShipRewards < 0:
-					raise ValueError('number of ships rewarded is out of range')
-		eventRsa(eventJson)
-	elif eventType == 'result':
-		if not isinstance(eventJson['key'], basestring):
-			raise Exception('key is not a string')
-		if not isinstance(eventJson['count'], int):
-			raise Exception('count is not an integer')
-		if eventJson['count'] <= 0:
-			raise Exception('count is out of range')
-	else:
-		raise Exception('unrecognized event of type %s' % eventType)
+	outputIndices = []
+	for currentOutput in eventJson['outputs']:
+		eventOutput(currentOutput)
+		outputIndex = currentOutput['index']
+		if outputIndex in outputIndices:
+			raise Exception('duplicate output index %s' % outputIndex)
+		outputIndices.append(outputIndex)
+
+	if util.hashEvent(eventJson) != eventJson['hash']:
+		raise Exception('provided hash does not match the calculated one')	
+
+def eventInput(inputJson):
+	if not isinstance(inputJson['index'], int):
+		raise Exception('type is not an integer')
+	if not isinstance(inputJson['key'], basestring):
+		raise Exception('key is not a string')
+	
+	if inputJson['index'] < 0:
+		raise Exception('index is out of range')
+
+	fieldIsSha256(inputJson['key'], 'key')
+
+def eventOutput(outputJson):
+	if not isinstance(outputJson['index'], int):
+		raise Exception('type is not an integer')
+	if not isinstance(outputJson['type'], basestring):
+		raise Exception('type is not a string')
+	if not isinstance(outputJson['fleet_hash'], basestring):
+		raise Exception('fleet_hash is not a string')
+	if not isinstance(outputJson['key'], basestring):
+		raise Exception('key is not a string')
+	if not isinstance(outputJson['star_system'], basestring):
+		raise Exception('star_system is not a string')
+	if not isinstance(outputJson['count'], basestring):
+		raise Exception('count is not an integer')
+	
+	if outputJson['index'] < 0:
+		raise Exception('index is out of range')
+	if outputJson['count'] <= 0:
+		raise Exception('count is out of range')
+
+	fieldIsSha256(outputJson['fleet_hash'], 'fleet_hash')
+	fieldIsSha256(outputJson['key'], 'key')
+	fieldIsSha256(outputJson['star_system'], 'star_system')
 
 def eventRsa(eventJson):
 	'''Verifies the Rsa signature of the provided event json.

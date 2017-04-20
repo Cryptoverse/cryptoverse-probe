@@ -164,13 +164,13 @@ def concatEvent(eventJson):
 	Returns:
 		str: Resulting concatenated information of the event.
 	'''
-	concat = eventJson['fleet_hash']
-	for currentInput in eventJson['inputs']:
-		concat += '%s%s%s%s%s' % (currentInput['type'], currentInput['fleet_hash'], currentInput['key'], currentInput['star_system'], currentInput['count'])
-	# TODO: Remove duplicate code.
-	for currentInput in eventJson['outputs']:
-		concat += '%s%s%s%s%s' % (currentInput['type'], currentInput['fleet_hash'], currentInput['key'], currentInput['star_system'], currentInput['count'])
-	
+	concat = '%s%s%s' % (eventJson['fleet_hash'], eventJson['fleet_key'], eventJson['type'])
+	if eventJson['inputs']:
+		for currentInput in sorted(eventJson['inputs'], key=lambda x: x['index']):
+			concat += currentInput['key']
+	if eventJson['outputs']:
+		for currentOutput in sorted(eventJson['outputs'], key=lambda x: x['index']):
+			concat += '%s%s%s%s%s' % (currentOutput['type'], currentOutput['fleet_hash'], currentOutput['key'], currentOutput['star_system'], currentOutput['count'])
 	return concat
 
 def expandRsaPublicKey(shrunkPublicKey):
@@ -231,8 +231,19 @@ def hashEvents(events):
 	'''
 	concat = ''
 	for event in events:
-		concat += concatEvent(event)
+		concat += hashEvent(event)
 	return sha256(concat)
+
+def hashEvent(event):
+	'''Hashed value of the provided event.
+
+	Args:
+		event (dict): Json data for the event to be hashed.
+
+	Returns:
+		str: Sha256 hash of the provided event.
+	'''
+	return sha256(concatEvent(event))
 
 def unpackBits(difficulty):
 	'''Unpacks int difficulty into a target hex.
@@ -296,6 +307,21 @@ def getFleets(eventsJson):
 		results.append((fleetHash, fleetKey))
 	return results
 
+def getEventInputs(eventsJson):
+	'''Gets all input events.
+
+	Args:
+		eventsJson (dict): List of all events to search.
+	
+	Returns:
+		list: A list the input events.
+	'''
+	results = []
+	for currentEvent in eventsJson:
+		for currentOutput in currentEvent['inputs']:
+			results.append(currentOutput)
+	return results
+
 def getEventOutputs(eventsJson):
 	'''Gets all output events.
 
@@ -303,7 +329,7 @@ def getEventOutputs(eventsJson):
 		eventsJson (dict): List of all events to search.
 	
 	Returns:
-		list: A list the input events.
+		list: A list the output events.
 	'''
 	results = []
 	for currentEvent in eventsJson:

@@ -260,6 +260,7 @@ def generateNextStarLog(height=None):
 	}
 
 	rewardEvent = {
+		'index': 0,
 		'hash': None,
 		'type': 'reward',
 		'fleet_hash': util.sha256(accountInfo['public_key']),

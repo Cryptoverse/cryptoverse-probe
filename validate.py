@@ -135,6 +135,8 @@ def event(eventJson):
 		raise Exception('fleet_key is not a string')
 	if not isinstance(eventJson['hash'], basestring):
 		raise Exception('hash is not a string')
+	if not isinstance(eventJson['index'], int):
+		raise Exception('index is not an integer')
 	
 	fieldIsSha256(eventJson['hash'], 'hash')
 
@@ -162,7 +164,7 @@ def event(eventJson):
 
 def eventInput(inputJson):
 	if not isinstance(inputJson['index'], int):
-		raise Exception('type is not an integer')
+		raise Exception('index is not an integer')
 	if not isinstance(inputJson['key'], basestring):
 		raise Exception('key is not a string')
 	
@@ -173,16 +175,18 @@ def eventInput(inputJson):
 
 def eventOutput(outputJson):
 	if not isinstance(outputJson['index'], int):
-		raise Exception('type is not an integer')
+		raise Exception('index is not an integer')
 	if not isinstance(outputJson['type'], basestring):
 		raise Exception('type is not a string')
 	if not isinstance(outputJson['fleet_hash'], basestring):
 		raise Exception('fleet_hash is not a string')
 	if not isinstance(outputJson['key'], basestring):
 		raise Exception('key is not a string')
-	if not isinstance(outputJson['star_system'], basestring):
-		raise Exception('star_system is not a string')
-	if not isinstance(outputJson['count'], basestring):
+	if outputJson['star_system'] is not None:
+		if not isinstance(outputJson['star_system'], basestring):
+			raise Exception('star_system is not a string')
+		fieldIsSha256(outputJson['star_system'], 'star_system')
+	if not isinstance(outputJson['count'], int):
 		raise Exception('count is not an integer')
 	
 	if outputJson['index'] < 0:
@@ -192,8 +196,7 @@ def eventOutput(outputJson):
 
 	fieldIsSha256(outputJson['fleet_hash'], 'fleet_hash')
 	fieldIsSha256(outputJson['key'], 'key')
-	fieldIsSha256(outputJson['star_system'], 'star_system')
-
+	
 def eventRsa(eventJson):
 	'''Verifies the Rsa signature of the provided event json.
 

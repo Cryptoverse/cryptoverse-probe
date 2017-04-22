@@ -12,6 +12,8 @@ difficultyInterval = int(os.getenv('DIFFICULTY_INTERVAL', '7560'))
 difficultyDuration = int(os.getenv('DIFFICULTY_DURATION', '1209600'))
 difficultyStart = int(os.getenv('DIFFICULTY_START', '486604799'))
 shipReward = int(os.getenv('SHIP_REWARD', '10'))
+maximumStarLogSize = int(os.getenv('STARLOGS_MAX_BYTES', '999999'))
+maximumEventSize = int(os.getenv('EVENTS_MAX_BYTES', '999999'))
 maximumTarget = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
 emptyTarget = '0000000000000000000000000000000000000000000000000000000000000000'
 

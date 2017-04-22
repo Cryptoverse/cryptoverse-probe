@@ -121,11 +121,13 @@ def events(eventsJson):
 				raise Exception('event output key %s is listed more than once' % key)
 			outputKeys.append(key)
 
-def event(eventJson):
+def event(eventJson, requireIndex=True, requireStarSystem=False, rewardAllowed=True):
 	'''Verifies the fields of an event.
 
 	Args:
 		eventJson (dict): Target.
+		requireIndex (bool): Verifies an integer index is included if True.
+		requireStarSystem (bool): Verifies that every output specifies a star system if True.
 	'''
 	if not isinstance(eventJson['type'], basestring):
 		raise Exception('type is not a string')
@@ -135,11 +137,13 @@ def event(eventJson):
 		raise Exception('fleet_key is not a string')
 	if not isinstance(eventJson['hash'], basestring):
 		raise Exception('hash is not a string')
-	if not isinstance(eventJson['index'], int):
+	if requireIndex and not isinstance(eventJson['index'], int):
 		raise Exception('index is not an integer')
 	
 	fieldIsSha256(eventJson['hash'], 'hash')
 
+	if not rewardAllowed and eventJson['type'] == 'reward':
+		raise Exception('event of type %s forbidden' % eventJson['type'])
 	if eventJson['type'] not in ['reward']:
 		raise Exception('unrecognized event of type %s' % eventJson['type'])
 
@@ -153,14 +157,16 @@ def event(eventJson):
 	
 	outputIndices = []
 	for currentOutput in eventJson['outputs']:
-		eventOutput(currentOutput)
+		eventOutput(currentOutput, requireStarSystem)
 		outputIndex = currentOutput['index']
 		if outputIndex in outputIndices:
 			raise Exception('duplicate output index %s' % outputIndex)
 		outputIndices.append(outputIndex)
 
 	if util.hashEvent(eventJson) != eventJson['hash']:
-		raise Exception('provided hash does not match the calculated one')	
+		raise Exception('provided hash does not match the calculated one')
+
+	# TODO: Validate signatures
 
 def eventInput(inputJson):
 	if not isinstance(inputJson['index'], int):
@@ -173,7 +179,7 @@ def eventInput(inputJson):
 
 	fieldIsSha256(inputJson['key'], 'key')
 
-def eventOutput(outputJson):
+def eventOutput(outputJson, requireStarSystem=False):
 	if not isinstance(outputJson['index'], int):
 		raise Exception('index is not an integer')
 	if not isinstance(outputJson['type'], basestring):
@@ -182,6 +188,8 @@ def eventOutput(outputJson):
 		raise Exception('fleet_hash is not a string')
 	if not isinstance(outputJson['key'], basestring):
 		raise Exception('key is not a string')
+	if outputJson['star_system'] is None and requireStarSystem:
+		raise Exception('star_system is missing')
 	if outputJson['star_system'] is not None:
 		if not isinstance(outputJson['star_system'], basestring):
 			raise Exception('star_system is not a string')

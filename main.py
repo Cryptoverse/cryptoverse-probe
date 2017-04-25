@@ -2,12 +2,15 @@ import traceback
 import os
 import json
 import sys
+from ete3 import Tree
 from datetime import datetime
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import requests
+import database
 
+autoRebuild = int(os.getenv('AUTO_REBUILD', '0')) == 1
 persistentFileName = 'persistent.json'
 hostUrl = os.getenv('HOST_URL', 'http://localhost:5000')
 rulesUrl = hostUrl + '/rules'
@@ -19,12 +22,16 @@ difficultyInterval = None
 difficultyDuration = None
 difficultyStart = None
 shipReward = None
+starLogsMaxLimit = None
+eventsMaxLimit = None
+chainsMaxLimit = None
 util = None
 persistentData = None
 
 def getGenesis():
 	return {
 		'nonce': 0,
+		'height': 0,
 		'hash': util.emptyTarget,
 		'difficulty': difficultyStart,
 		'events': [],
@@ -215,6 +222,7 @@ def accountSet(name):
 def info():
 	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration) 
 
+# TODO: Why is this called chain?
 def chain():
 	print prettyJson(getRequest(starLogsUrl))
 
@@ -228,6 +236,8 @@ def probe(params=None):
 	print prettyJson(generated)
 	try:
 		postResult = postRequest(starLogsUrl, generated)
+		if postResult == 200:
+			database.addStarLog(generated)
 		print 'Posted starlog with response %s' % postResult
 	except:
 		traceback.print_exc()
@@ -248,6 +258,7 @@ def generateNextStarLog(height=None):
 		result = getRequest(chainsUrl, {'height': height})
 		if result:
 			starLog = result[0]
+			height = starLog['height']
 	accountInfo = getAccount()[1]
 	
 	rewardOutput = {
@@ -285,6 +296,7 @@ def generateNextStarLog(height=None):
 	starLog['time'] = util.getTime()
 	starLog['nonce'] = 0
 	starLog['log_header'] = util.concatStarLogHeader(starLog)
+	starLog['height'] = height + 1
 	found = False
 	tries = 0
 	started = datetime.now()
@@ -313,6 +325,75 @@ def generateNextStarLog(height=None):
 		return None
 	return starLog
 
+def sync():
+	latest = database.getStarLogLatest()
+	latestTime = 0 if latest is None else latest['time']
+	allResults = []
+	lastCount = starLogsMaxLimit
+	offset = 0
+	while starLogsMaxLimit == lastCount:
+		results = getRequest(starLogsUrl, { 'since_time': latestTime, 'limit': starLogsMaxLimit, 'offset': offset })
+		lastCount = len(results)
+		offset += lastCount
+		allResults += results
+
+	for result in allResults:
+		database.addStarLog(result)
+
+	print 'Syncronized %s starlogs' % len(allResults)
+	
+def renderChain(params=None):
+	limit = 6
+	height = None
+	if params:
+		if 1 == len(params):
+			limit = int(params[0])
+		else:
+			allParams = ''
+			for param in params:
+				allParams += ' %s' % param
+			print 'Unrecognized parameters "%s"' % allParams
+			return
+	highest = database.getStarLogHighest()
+	if highest is None:
+		print 'No starlogs to render, try "sync"'
+		return
+	height = highest['height'] if height is None else height
+	results = database.getStarLogsAtHight(height, limit)
+	strata = [(height, list(results))]
+	remaining = limit - len(results)
+	while 0 < height and remaining != 0:
+		height -= 1
+		ancestorResults = database.getStarLogsAtHight(height, remaining)
+		currentResults = []
+		for ancestor in ancestorResults:
+			hasChildren = False
+			for result in results:
+				hasChildren = result['previous_hash'] == ancestor['hash']
+				if hasChildren:
+					break
+			results.append(ancestor)
+			if not hasChildren:
+				currentResults.append(ancestor)
+		if currentResults:
+			strata.append((height, currentResults))
+			remaining = limit - len(currentResults)
+	
+	tree = Tree()
+	lastNode = tree
+	count = len(strata)
+	for i in reversed(range(0, count)):
+		stratum = strata[i]
+		if i == 0:
+			for orphan in stratum[1]:
+				lastNode.add_child(name=orphan['hash'][:6])
+		else:
+			lastNode = lastNode.add_child()
+			for orphan in stratum[1]:
+				lastNode.add_sister(name=orphan['hash'][:6])
+		
+	print tree
+
 if __name__ == '__main__':
 	print 'Starting probe...'
 	rules = getRequest(rulesUrl)
@@ -323,6 +404,9 @@ if __name__ == '__main__':
 	difficultyDuration = rules['difficulty_duration']
 	difficultyStart = rules['difficulty_start']
 	shipReward = rules['ship_reward']
+	starLogsMaxLimit = rules['star_logs_max_limit']
+	eventsMaxLimit = rules['events_max_limit']
+	chainsMaxLimit = rules['chains_max_limit']
 
 	os.environ['DIFFICULTY_FUDGE'] = str(difficultyFudge)
 	os.environ['DIFFICULTY_INTERVAL'] = str(difficultyInterval)
@@ -335,6 +419,13 @@ if __name__ == '__main__':
 
 	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart, shipReward)
 	
+	if autoRebuild:
+		print 'Automatically rebuilding database...'
+
+	database.initialize(autoRebuild)
+
+	sync()
+
 	allCommands = {
 		'info': createCommand(
 			info, 
@@ -361,6 +452,14 @@ if __name__ == '__main__':
 				'Passing "all" lists all accounts stored in persistent data',
 				'Passing "set" followed by an account name changes the current account to the specified one',
 				'Passing "clear" disables any active accounts'
+			]
+		),
+		'rchain': createCommand(
+			renderChain,
+			'Render starlog chain information to the command line',
+			[
+				'Passing no arguments renders the highest chains and their siblings',
+				'Passing an integer greater than zero renders that many chains'
 			]
 		)
 	}

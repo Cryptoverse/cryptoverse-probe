@@ -28,22 +28,10 @@ def addStarLog(starLogJson):
 	connection, cursor = begin()
 	try:
 		if cursor.execute('SELECT * FROM star_logs WHERE hash=?', (starLogJson['hash'],)).fetchone():
-			# TODO: Remove this print.
-			print 'one already exists'
 			return
 		
 		cursor.execute('INSERT INTO star_logs VALUES (?, ?, ?, ?, ?)', (starLogJson['hash'], starLogJson['previous_hash'], starLogJson['height'], starLogJson['time'], json.dumps(starLogJson)))
 		connection.commit()
-		# t = ('RHAT',)
-		# c.execute('SELECT * FROM stocks WHERE symbol=?', t)
-		# print c.fetchone()
-
-		# # Larger example that inserts many records at a time
-		# purchases = [('2006-03-28', 'BUY', 'IBM', 1000, 45.00),
-		# 			('2006-04-05', 'BUY', 'MSFT', 1000, 72.00),
-		# 			('2006-04-06', 'SELL', 'IBM', 500, 53.00),
-		# 			]
-		# c.executemany('INSERT INTO stocks VALUES (?,?,?,?,?)', purchases)
 	finally:
 		connection.close()
 
@@ -71,5 +59,12 @@ def getStarLogsAtHight(height, limit):
 		for result in dbResults:
 			results.append(json.loads(result[0]))
 		return results
+	finally:
+		connection.close()
+
+def getStarLogHashes():
+	connection, cursor = begin()
+	try:
+		return cursor.execute('SELECT hash FROM star_logs').fetchall()
 	finally:
 		connection.close()

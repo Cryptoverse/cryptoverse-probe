@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import requests
 import database
+import parameterUtil as putil
 
 autoRebuild = int(os.getenv('AUTO_REBUILD', '0')) == 1
 persistentFileName = 'persistent.json'
@@ -223,7 +224,12 @@ def info():
 	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration) 
 
 # TODO: Why is this called chain?
-def chain():
+def starLog(params=None):
+	targetHash = None
+	if putil.hasAny(params):
+		if putil.hasSingle(params):
+			targetHash = putil.singleStr(params)
+	# TODO: Actually support targetHash.
 	print prettyJson(getRequest(starLogsUrl))
 
 def probe(params=None):
@@ -325,7 +331,8 @@ def generateNextStarLog(height=None):
 		return None
 	return starLog
 
-def sync():
+def sync(params=None):
+	silent = putil.retrieve(params, '-s', True, False)
 	latest = database.getStarLogLatest()
 	latestTime = 0 if latest is None else latest['time']
 	allResults = []
@@ -340,20 +347,20 @@ def sync():
 	for result in allResults:
 		database.addStarLog(result)
 
-	print 'Syncronized %s starlogs' % len(allResults)
+	if not silent:
+		print 'Syncronized %s starlogs' % len(allResults)
 	
 def renderChain(params=None):
 	limit = 6
 	height = None
-	if params:
-		if 1 == len(params):
-			limit = int(params[0])
+	# TODO: Actually get height from parameters.
+	if putil.hasAny(params):
+		if putil.hasSingle(params):
+			limit = putil.singleInt(params)
 		else:
-			allParams = ''
-			for param in params:
-				allParams += ' %s' % param
-			print 'Unrecognized parameters "%s"' % allParams
+			print 'unsupported parameters'
 			return
+
 	highest = database.getStarLogHighest()
 	if highest is None:
 		print 'No starlogs to render, try "sync"'
@@ -394,6 +401,18 @@ def renderChain(params=None):
 		
 	print tree
 
+# def jump(origin, destination):
+# 	accountInfo = getAccount()[1]
+# 	jumpInfo = {
+# 		'fleet_hash': accountInfo['hash'],
+# 		'fleet_key': accountInfo['public_key'],
+# 		'hash': None,
+# 		'inputs': [],
+# 		'outputs': [],
+# 		'signature': None,
+# 		'type': 'jump'
+# 	}
+
 if __name__ == '__main__':
 	print 'Starting probe...'
 	rules = getRequest(rulesUrl)
@@ -431,8 +450,8 @@ if __name__ == '__main__':
 			info, 
 			'Displays information about the connected server'
 		),
-		'chain': createCommand(
-			chain, 
+		'slog': createCommand(
+			starLog, 
 			'Retrieves the latest starlog'
 		),
 		'probe': createCommand(

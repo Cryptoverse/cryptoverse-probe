@@ -403,8 +403,10 @@ def renderChain(params=None):
 
 def listDeployments(params=None):
 	hashQuery = None
+	verbose = False
 	if putil.hasAny(params):
 		hashQuery = putil.singleStr(params)
+		verbose = putil.retrieve(params, '-v', True, False)
 	else:
 		print 'Specify a system hash to list the deployments in that system'
 		return
@@ -412,26 +414,74 @@ def listDeployments(params=None):
 	if selectedHash is None:
 		print 'Unable to find a system hash containing %s' % hashQuery
 		return
-	highestHash = database.getStarLogHighest()['hash']
-	events = database.getUnusedDeployments(highestHash)
-	deployments = []
-	for event in events:
-		if event['star_system'] == selectedHash:
-			deployments.append(event)
-	
-	print prettyJson(deployments)
+	deployments = database.getUnusedDeployments(systemHash=selectedHash)
+	if verbose:
+		print prettyJson(deployments)
+		return
+	fleets = {}
+	for deployment in deployments:
+		fleet = deployment['fleet_hash']
+		count = deployment['count']
+		if fleet in fleets:
+			fleets[fleet] += count
+		else:
+			fleets[fleet] = count
+	result = 'No deployments in system %s' % selectedHash
+	if fleets:
+		result = 'Deployments in star system %s' % selectedHash
+		fleetKeys = fleets.keys()
+		for i in range(0, len(fleets)):
+			currFleet = fleetKeys[i]
+			result += '\n - [%s] : %s' % (currFleet[:6], fleets[currFleet])
+		
+	print result
 
-# def jump(origin, destination):
-# 	accountInfo = getAccount()[1]
-# 	jumpInfo = {
-# 		'fleet_hash': accountInfo['hash'],
-# 		'fleet_key': accountInfo['public_key'],
-# 		'hash': None,
-# 		'inputs': [],
-# 		'outputs': [],
-# 		'signature': None,
-# 		'type': 'jump'
-# 	}
+def jump(params=None):
+	originHash = None
+	destinationHash = None
+	count = None
+	if putil.hasAny(params):
+		if len(params) < 2:
+			print 'An origin and destination system must be specified'
+			return
+		originHash = params[0]
+		destinationHash = params[1]
+		if len(params) == 3:
+			count = int(params[2])
+	else:
+		print 'Specify an origin and destination system'
+		return
+	hashes = database.getStarLogHashes()
+	originHash = putil.naturalMatch(originHash, hashes)
+	destinationHash = putil.naturalMatch(destinationHash, hashes)
+	if originHash is None:
+		print 'Unable to find an origin system containing %s' % originHash
+	if destinationHash is None:
+		print 'Unable to find a destination system containing %s' % destinationHash
+	accountInfo = getAccount()[1]
+	deployments = database.getUnusedDeployments(systemHash=originHash, fleetHash=util.sha256(accountInfo['public_key']))
+	totalShips = 0
+	for deployment in deployments:
+		totalShips += deployment['count']
+	if count is None:
+		count = totalShips
+	elif totalShips < count:
+		print 'Not enough ships to jump from the origin system'
+		return
+	if count <= 0:
+		print 'A number of ships greater than zero must be specified for a jump'
+		return
+	# TODO: The rest of jump logic!
+
+	# jumpInfo = {
+	# 	'fleet_hash': accountInfo['hash'],
+	# 	'fleet_key': accountInfo['public_key'],
+	# 	'hash': None,
+	# 	'inputs': [],
+	# 	'outputs': [],
+	# 	'signature': None,
+	# 	'type': 'jump'
+	# }
 
 if __name__ == '__main__':
 	print 'Starting probe...'
@@ -506,6 +556,14 @@ if __name__ == '__main__':
 			'List deployments in the specified system',
 			[
 				'Passing a partial hash will list deployments in the best matching system'	
+			]
+		),
+		'jump': createCommand(
+			jump,
+			'Jump ships from one system to another',
+			[
+				'Passing partial origin and destination hashes will jump all ships from the origin system',
+				'Passing partial origin and destination hashes along with a valid number of ships will jump that many from the origin system'
 			]
 		)
 	}

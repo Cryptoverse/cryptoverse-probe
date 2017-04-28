@@ -82,13 +82,15 @@ def getStarLogHashes():
 	finally:
 		connection.close()
 
-def getUnusedDeployments(systemHash):
+def getUnusedDeployments(fromStarLog=None, systemHash=None, fleetHash=None):
 	connection, cursor = begin()
 	try:
+		if fromStarLog is None:
+			fromStarLog = getStarLogHighest()['hash']
 		usedEvents = []
 		results = []
-		while systemHash is not None and not util.isGenesisStarLog(systemHash):
-			system = getStarLog(systemHash)
+		while fromStarLog is not None and not util.isGenesisStarLog(fromStarLog):
+			system = getStarLog(fromStarLog)
 			for event in system['events']:
 				if event['type'] not in util.shipEventTypes:
 					continue
@@ -96,8 +98,12 @@ def getUnusedDeployments(systemHash):
 					usedEvents.append(eventInput)
 				for eventOutput in event['outputs']:
 					if eventOutput['type'] in util.shipEventTypes and eventOutput['key'] not in usedEvents:
+						if systemHash is not None and eventOutput['star_system'] != systemHash:
+							continue
+						if fleetHash is not None and eventOutput['fleet_hash'] != fleetHash:
+							continue
 						results.append(eventOutput)
-			systemHash = system['previous_hash']
+			fromStarLog = system['previous_hash']
 		return results
 	finally:
 		connection.close()

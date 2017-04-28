@@ -24,6 +24,12 @@ eventTypes = [
 	'attack'
 ]
 
+shipEventTypes = [
+	'reward',
+	'jump',
+	'attack'
+]
+
 if not 0 <= difficultyFudge <= 8:
 	raise ValueError('DIFFICULTY_FUDGE must be a value from 0 to 8 (inclusive)')
 elif 0 < difficultyFudge:

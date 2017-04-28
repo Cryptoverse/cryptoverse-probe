@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import json
+import util
 
 databaseFileName = 'local.db'
 
@@ -51,6 +52,14 @@ def getStarLogHighest():
 	finally:
 		connection.close()
 
+def getStarLog(systemHash):
+	connection, cursor = begin()
+	try:
+		result = cursor.execute('SELECT json FROM star_logs WHERE hash=?', (systemHash,)).fetchone()
+		return None if result is None else json.loads(result[0])
+	finally:
+		connection.close()
+
 def getStarLogsAtHight(height, limit):
 	connection, cursor = begin()
 	try:
@@ -65,6 +74,30 @@ def getStarLogsAtHight(height, limit):
 def getStarLogHashes():
 	connection, cursor = begin()
 	try:
-		return cursor.execute('SELECT hash FROM star_logs').fetchall()
+		fetched = cursor.execute('SELECT hash FROM star_logs').fetchall()
+		hashes = []
+		for entry in fetched:
+			hashes.append(entry[0])
+		return hashes
+	finally:
+		connection.close()
+
+def getUnusedDeployments(systemHash):
+	connection, cursor = begin()
+	try:
+		usedEvents = []
+		results = []
+		while systemHash is not None and not util.isGenesisStarLog(systemHash):
+			system = getStarLog(systemHash)
+			for event in system['events']:
+				if event['type'] not in util.shipEventTypes:
+					continue
+				for eventInput in event['inputs']:
+					usedEvents.append(eventInput)
+				for eventOutput in event['outputs']:
+					if eventOutput['type'] in util.shipEventTypes and eventOutput['key'] not in usedEvents:
+						results.append(eventOutput)
+			systemHash = system['previous_hash']
+		return results
 	finally:
 		connection.close()

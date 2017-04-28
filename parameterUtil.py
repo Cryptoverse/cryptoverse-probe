@@ -24,3 +24,15 @@ def retrieveValue(params, keyword, defaultValue):
 			if params[i] == keyword and i + 1 < count:
 				return params[i + 1]
 	return defaultValue
+
+def naturalMatch(query, values):
+	closest = None
+	closestIndex = -1
+	for value in values:
+		currIndex = value.find(query)
+		if currIndex == -1:
+			continue
+		if closestIndex == -1 or currIndex < closestIndex:
+			closest = value
+			closestIndex = currIndex
+	return closest

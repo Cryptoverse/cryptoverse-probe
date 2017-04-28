@@ -401,6 +401,26 @@ def renderChain(params=None):
 		
 	print tree
 
+def listDeployments(params=None):
+	hashQuery = None
+	if putil.hasAny(params):
+		hashQuery = putil.singleStr(params)
+	else:
+		print 'Specify a system hash to list the deployments in that system'
+		return
+	selectedHash = putil.naturalMatch(hashQuery, database.getStarLogHashes())
+	if selectedHash is None:
+		print 'Unable to find a system hash containing %s' % hashQuery
+		return
+	highestHash = database.getStarLogHighest()['hash']
+	events = database.getUnusedDeployments(highestHash)
+	deployments = []
+	for event in events:
+		if event['star_system'] == selectedHash:
+			deployments.append(event)
+	
+	print prettyJson(deployments)
+
 # def jump(origin, destination):
 # 	accountInfo = getAccount()[1]
 # 	jumpInfo = {
@@ -479,6 +499,13 @@ if __name__ == '__main__':
 			[
 				'Passing no arguments renders the highest chains and their siblings',
 				'Passing an integer greater than zero renders that many chains'
+			]
+		),
+		'ldeploy': createCommand(
+			listDeployments,
+			'List deployments in the specified system',
+			[
+				'Passing a partial hash will list deployments in the best matching system'	
 			]
 		)
 	}

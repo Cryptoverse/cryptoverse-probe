@@ -144,7 +144,7 @@ def event(eventJson, requireIndex=True, requireStarSystem=False, rewardAllowed=T
 
 	if not rewardAllowed and eventJson['type'] == 'reward':
 		raise Exception('event of type %s forbidden' % eventJson['type'])
-	if eventJson['type'] not in ['reward']:
+	if eventJson['type'] not in ['reward', 'jump']:
 		raise Exception('unrecognized event of type %s' % eventJson['type'])
 
 	inputIndices = []

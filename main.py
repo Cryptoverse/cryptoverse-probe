@@ -17,6 +17,7 @@ hostUrl = os.getenv('HOST_URL', 'http://localhost:5000')
 rulesUrl = hostUrl + '/rules'
 chainsUrl = hostUrl + '/chains'
 starLogsUrl = hostUrl + '/star-logs'
+eventsUrl = hostUrl + '/events'
 
 difficultyFudge = None
 difficultyInterval = None
@@ -40,6 +41,22 @@ def getGenesis():
 		'time': 0,
 		'previous_hash': util.emptyTarget,
 		'events_hash': None
+	}
+
+def getEventInput(index, key):
+	return {
+		'index': index,
+		'key': key
+	}
+
+def getEventOutput(index, count, fleetHash, key, starSystem, typeName):
+	return {
+		'index': index,
+		'count': count,
+		'fleet_hash': fleetHash,
+		'key': key,
+		'star_system': starSystem,
+		'type': typeName
 	}
 
 def loadPersistent():
@@ -223,7 +240,6 @@ def accountSet(name):
 def info():
 	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration) 
 
-# TODO: Why is this called chain?
 def starLog(params=None):
 	targetHash = None
 	if putil.hasAny(params):
@@ -459,7 +475,8 @@ def jump(params=None):
 	if destinationHash is None:
 		print 'Unable to find a destination system containing %s' % destinationHash
 	accountInfo = getAccount()[1]
-	deployments = database.getUnusedDeployments(systemHash=originHash, fleetHash=util.sha256(accountInfo['public_key']))
+	fleetHash = util.sha256(accountInfo['public_key'])
+	deployments = database.getUnusedDeployments(systemHash=originHash, fleetHash=fleetHash)
 	totalShips = 0
 	for deployment in deployments:
 		totalShips += deployment['count']
@@ -471,17 +488,42 @@ def jump(params=None):
 	if count <= 0:
 		print 'A number of ships greater than zero must be specified for a jump'
 		return
-	# TODO: The rest of jump logic!
 
-	# jumpInfo = {
-	# 	'fleet_hash': accountInfo['hash'],
-	# 	'fleet_key': accountInfo['public_key'],
-	# 	'hash': None,
-	# 	'inputs': [],
-	# 	'outputs': [],
-	# 	'signature': None,
-	# 	'type': 'jump'
-	# }
+	jumpEvent = {
+		'fleet_hash': fleetHash,
+		'fleet_key': accountInfo['public_key'],
+		'hash': None,
+		'inputs': [],
+		'outputs': [],
+		'signature': None,
+		'type': 'jump'
+	}
+
+	inputs = []
+	inputIndex = 0
+	totalInputCount = 0
+	for deployment in deployments:
+		totalInputCount += deployment['count']
+		inputs.append(getEventInput(inputIndex, deployment['key']))
+		inputIndex += 1
+		if count <= totalInputCount:
+			break
+	extraShips = totalInputCount - count
+	outputs = []
+	index = 0
+	jumpKey = util.sha256('%s%s%s%s' % (util.getTime(), fleetHash, originHash, destinationHash))
+	if 0 < extraShips:
+		outputs.append(getEventOutput(index, extraShips, fleetHash, util.sha256('%s%s' % (jumpKey, jumpKey)), originHash, 'jump'))
+		index += 1
+	outputs.append(getEventOutput(index, count, fleetHash, jumpKey, destinationHash, 'jump'))
+
+	jumpEvent['inputs'] = inputs
+	jumpEvent['outputs'] = outputs
+	jumpEvent['hash'] = util.hashEvent(jumpEvent)
+	jumpEvent['signature'] = util.rsaSign(accountInfo['private_key'], jumpEvent['hash'])
+
+	result = postRequest(eventsUrl, jumpEvent)
+	print 'Posted jump event with response %s' % result
 
 if __name__ == '__main__':
 	print 'Starting probe...'

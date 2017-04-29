@@ -246,16 +246,23 @@ def starLog(params=None):
 	print prettyJson(getRequest(starLogsUrl))
 
 def probe(params=None):
+	# TODO: Sync first...
 	height = None
 	post = True
 	verbose = False
 	silent = False
+	allowDuplicateEvents = False
+	fromStarLog = None
 	if params:
 		height = putil.retrieve(params, '-g', -1, height)
-		post = putil.retrieve(params, '-np', False, post)
+		post = putil.retrieve(params, '-a', False, post)
 		verbose = putil.retrieve(params, '-v', True, verbose)
 		silent = putil.retrieve(params, '-s', True, silent)
-	generated = generateNextStarLog(height)
+		allowDuplicateEvents = putil.retrieve(params, '-d', True, allowDuplicateEvents)
+		fromStarLog = putil.retrieveValue(params, '-f', fromStarLog)
+	if fromStarLog is not None:
+		fromStarLog = putil.naturalMatch(fromStarLog, database.getStarLogHashes())
+	generated = generateNextStarLog(fromStarLog, height, allowDuplicateEvents)
 	if not silent:
 		print 'Probed new starlog %s' % generated['hash'][:6]
 		if verbose:
@@ -265,6 +272,7 @@ def probe(params=None):
 	try:
 		postResult = postRequest(starLogsUrl, generated)
 		if postResult == 200:
+			print 'adding to database'
 			database.addStarLog(generated)
 		if not silent:
 			print 'Posted starlog with response %s' % postResult
@@ -272,18 +280,22 @@ def probe(params=None):
 		traceback.print_exc()
 		print 'Something went wrong when trying to post the generated starlog'
 
-def generateNextStarLog(height=None):
+def generateNextStarLog(fromStarLog=None, height=None, allowDuplicateEvents=False):
 	nextStarLog = getGenesis()
-	if height:
+	if fromStarLog:
+		nextStarLog = database.getStarLog(fromStarLog)
+	elif height:
 		if height < -1:
 			raise ValueError('Paremeter "height" is out of range')
 		if height != -1:
+			# TODO: Change this to get from the local database
 			result = getRequest(chainsUrl, {'height': height})
 			if result:
 				nextStarLog = result[0]
 			else:
 				raise ValueError('No starlog at specified height could be retrieved')
 	else:
+		# TODO: Change this to get from the local database
 		result = getRequest(chainsUrl, {'height': height})
 		if result:
 			nextStarLog = result[0]
@@ -318,8 +330,9 @@ def generateNextStarLog(height=None):
 					currentUsedOutputs.append(outputKey)
 				if conflict:
 					continue
-				if database.anyEventsUsed(currentUsedInputs, nextStarLog['hash']) or database.anyEventsExist(currentUsedOutputs, nextStarLog['hash']):
-					continue
+				if not allowDuplicateEvents:
+					if database.anyEventsUsed(currentUsedInputs, nextStarLog['hash']) or database.anyEventsExist(currentUsedOutputs, nextStarLog['hash']):
+						continue
 				
 				usedInputs += currentUsedInputs
 				usedOutputs += currentUsedOutputs
@@ -352,6 +365,7 @@ def generateNextStarLog(height=None):
 
 	if not isGenesis:
 		# TODO: This won't work correctly if there are multiple genesis blocks!
+		# TODO: Change this to get from the local database
 		firstStarLog = getRequest(chainsUrl, {'height': 0})
 		# Until we have a way to select where to send your reward ships, just send them to the genesis block.
 		rewardOutput['star_system'] = firstStarLog[0]['hash']
@@ -414,6 +428,7 @@ def sync(params=None):
 		print 'Syncronized %s starlogs' % len(allResults)
 	
 def renderChain(params=None):
+	# TODO: Fix bug that causes rendering to mess up after probing.
 	limit = 6
 	height = None
 	# TODO: Actually get height from parameters.
@@ -624,7 +639,9 @@ if __name__ == '__main__':
 				'"-g" probes for a new genesis starlog', 
 				'"-v" prints the probed starlog to the console',
 				'"-s" silently executes the command',
-				'"-np" probes the next starlog without posting it to the server'
+				'"-a" aborts without posting starlog to the server'
+				'"-d" allow duplicate events'
+				'"-f" probes for a starlog ontop of the best matching system'
 			]
 		),
 		'account': createCommand(

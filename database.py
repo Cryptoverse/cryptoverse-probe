@@ -82,28 +82,52 @@ def getStarLogHashes():
 	finally:
 		connection.close()
 
-def getUnusedDeployments(fromStarLog=None, systemHash=None, fleetHash=None):
-	connection, cursor = begin()
-	try:
-		if fromStarLog is None:
-			fromStarLog = getStarLogHighest()['hash']
-		usedEvents = []
-		results = []
-		while fromStarLog is not None and not util.isGenesisStarLog(fromStarLog):
-			system = getStarLog(fromStarLog)
-			for event in system['events']:
-				if event['type'] not in util.shipEventTypes:
-					continue
-				for eventInput in event['inputs']:
-					usedEvents.append(eventInput)
-				for eventOutput in event['outputs']:
-					if eventOutput['type'] in util.shipEventTypes and eventOutput['key'] not in usedEvents:
-						if systemHash is not None and eventOutput['star_system'] != systemHash:
+def getUnusedEvents(fromStarLog=None, systemHash=None, fleetHash=None):
+	if fromStarLog is None:
+		fromStarLog = getStarLogHighest()['hash']
+	usedEvents = []
+	results = []
+	while fromStarLog is not None and not util.isGenesisStarLog(fromStarLog):
+		system = getStarLog(fromStarLog)
+		for event in system['events']:
+			if event['type'] not in util.shipEventTypes:
+				continue
+			for eventInput in event['inputs']:
+				usedEvents.append(eventInput)
+			for eventOutput in event['outputs']:
+				if eventOutput['type'] in util.shipEventTypes and eventOutput['key'] not in usedEvents:
+					if systemHash is not None:
+						if eventOutput['star_system'] is None:
+							if fromStarLog != systemHash:
+								continue
+						elif eventOutput['star_system'] != systemHash:
 							continue
-						if fleetHash is not None and eventOutput['fleet_hash'] != fleetHash:
-							continue
-						results.append(eventOutput)
-			fromStarLog = system['previous_hash']
-		return results
-	finally:
-		connection.close()
+					if fleetHash is not None and eventOutput['fleet_hash'] != fleetHash:
+						continue
+					results.append(eventOutput)
+		fromStarLog = system['previous_hash']
+	return results
+
+def anyEventsExist(events, fromStarLog=None):
+	if fromStarLog is None:
+		fromStarLog = getStarLogHighest()['hash']
+	while fromStarLog is not None and not util.isGenesisStarLog(fromStarLog):
+		system = getStarLog(fromStarLog)
+		for event in system['events']:
+			for eventEntry in event['inputs'] + event['outputs']:
+				if eventEntry['key'] in events:
+					return True
+		fromStarLog = system['previous_hash']
+	return False
+
+def anyEventsUsed(events, fromStarLog=None):
+	if fromStarLog is None:
+		fromStarLog = getStarLogHighest()['hash']
+	while fromStarLog is not None and not util.isGenesisStarLog(fromStarLog):
+		system = getStarLog(fromStarLog)
+		for event in system['events']:
+			for eventEntry in event['inputs']:
+				if eventEntry['key'] in events:
+					return True
+		fromStarLog = system['previous_hash']
+	return False

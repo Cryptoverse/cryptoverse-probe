@@ -247,17 +247,27 @@ def starLog(params=None):
 
 def probe(params=None):
 	height = None
+	post = True
+	verbose = False
+	silent = False
 	if params:
-		if 0 < len(params):
-			height = int(params[0])
+		height = putil.retrieve(params, '-g', -1, height)
+		post = putil.retrieve(params, '-np', False, post)
+		verbose = putil.retrieve(params, '-v', True, verbose)
+		silent = putil.retrieve(params, '-s', True, silent)
 	generated = generateNextStarLog(height)
-	print 'Probed new starlog'
-	print prettyJson(generated)
+	if not silent:
+		print 'Probed new starlog %s' % generated['hash'][:6]
+		if verbose:
+			print prettyJson(generated)
+	if not post:
+		return
 	try:
 		postResult = postRequest(starLogsUrl, generated)
 		if postResult == 200:
 			database.addStarLog(generated)
-		print 'Posted starlog with response %s' % postResult
+		if not silent:
+			print 'Posted starlog with response %s' % postResult
 	except:
 		traceback.print_exc()
 		print 'Something went wrong when trying to post the generated starlog'
@@ -273,16 +283,50 @@ def generateNextStarLog(height=None):
 				nextStarLog = result[0]
 			else:
 				raise ValueError('No starlog at specified height could be retrieved')
-	if not height:
+	else:
 		result = getRequest(chainsUrl, {'height': height})
 		if result:
 			nextStarLog = result[0]
 			height = nextStarLog['height']
+	isGenesis = util.isGenesisStarLog(nextStarLog['hash'])
 	accountInfo = getAccount()[1]
-	
 	nextStarLog['events'] = []
 
-
+	if not isGenesis:
+		eventResults = getRequest(eventsUrl, {'limit': eventsMaxLimit})
+		if eventResults:
+			usedInputs = []
+			usedOutputs = []
+			events = []
+			for event in eventResults:
+				validate.event(event, requireIndex=False, requireStarSystem=True, rewardAllowed=False)
+				conflict = False
+				currentUsedInputs = []
+				for currentInput in event['inputs']:
+					conflict = currentInput['key'] in usedInputs + currentUsedInputs
+					if conflict:
+						break
+					currentUsedInputs.append(currentInput['key'])
+				if conflict:
+					continue
+				currentUsedOutputs = []
+				for currentOutput in event['outputs']:
+					outputKey = currentOutput['key']
+					conflict = outputKey in usedInputs + usedOutputs + currentUsedInputs + currentUsedOutputs
+					if conflict:
+						break
+					currentUsedOutputs.append(outputKey)
+				if conflict:
+					continue
+				if database.anyEventsUsed(currentUsedInputs, nextStarLog['hash']) or database.anyEventsExist(currentUsedOutputs, nextStarLog['hash']):
+					continue
+				
+				usedInputs += currentUsedInputs
+				usedOutputs += currentUsedOutputs
+				event['index'] = len(events)
+				events.append(event)
+			
+			nextStarLog['events'] += events
 
 	rewardOutput = {
 		'index': 0,
@@ -294,7 +338,7 @@ def generateNextStarLog(height=None):
 	}
 
 	rewardEvent = {
-		'index': 0,
+		'index': len(nextStarLog['events']),
 		'hash': None,
 		'type': 'reward',
 		'fleet_hash': util.sha256(accountInfo['public_key']),
@@ -306,7 +350,8 @@ def generateNextStarLog(height=None):
 		'signature': None
 	}
 
-	if not util.isGenesisStarLog(nextStarLog['hash']):
+	if not isGenesis:
+		# TODO: This won't work correctly if there are multiple genesis blocks!
 		firstStarLog = getRequest(chainsUrl, {'height': 0})
 		# Until we have a way to select where to send your reward ships, just send them to the genesis block.
 		rewardOutput['star_system'] = firstStarLog[0]['hash']
@@ -432,7 +477,7 @@ def listDeployments(params=None):
 	if selectedHash is None:
 		print 'Unable to find a system hash containing %s' % hashQuery
 		return
-	deployments = database.getUnusedDeployments(systemHash=selectedHash)
+	deployments = database.getUnusedEvents(systemHash=selectedHash)
 	if verbose:
 		print prettyJson(deployments)
 		return
@@ -478,7 +523,7 @@ def jump(params=None):
 		print 'Unable to find a destination system containing %s' % destinationHash
 	accountInfo = getAccount()[1]
 	fleetHash = util.sha256(accountInfo['public_key'])
-	deployments = database.getUnusedDeployments(systemHash=originHash, fleetHash=fleetHash)
+	deployments = database.getUnusedEvents(systemHash=originHash, fleetHash=fleetHash)
 	totalShips = 0
 	for deployment in deployments:
 		totalShips += deployment['count']
@@ -576,8 +621,10 @@ if __name__ == '__main__':
 			'Probes the starlog in the chain', 
 			[
 				'Passing no arguments probes for a new starlog ontop of the highest chain member', 
-				'Passing "-1" probes for a new genesis starlog', 
-				'Passing a valid starlog height probes for starlogs on top of that memeber of the chain'
+				'"-g" probes for a new genesis starlog', 
+				'"-v" prints the probed starlog to the console',
+				'"-s" silently executes the command',
+				'"-np" probes the next starlog without posting it to the server'
 			]
 		),
 		'account': createCommand(

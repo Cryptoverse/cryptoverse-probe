@@ -106,7 +106,24 @@ def events(eventsJson):
 			for currentOutput in currentEvent['outputs']:
 				remainingShipRewards -= currentOutput['count']
 				if remainingShipRewards < 0:
-					raise ValueError('number of ships rewarded is out of range')
+					raise Exception('number of ships rewarded is out of range')
+				if currentOutput['type'] != 'reward':
+					raise Exception('reward outputs must be of type "reward"')
+		elif currentEvent['type'] == 'jump':
+			if len(currentEvent['inputs']) == 0:
+				raise Exception('jump events cannot have zero inputs')
+			outputLength = len(currentEvent['outputs'])
+			if outputLength == 0:
+				raise Exception('jump events cannot have zero outputs')
+			if 2 < outputLength:
+				raise Exception('jump events cannot have more than 2 outputs')
+			if 2 == outputLength and currentEvent['outputs'][0]['star_system'] == currentEvent['outputs'][1]['star_system']:
+				raise Exception('jump event cannot split in new system')
+			for currentOutput in currentEvent['outputs']:
+				if currentOutput['count'] <= 0:
+					raise Exception('jump events cannot jump zero or less ships')
+				if currentOutput['type'] != 'jump':
+					raise Exception('jump outputs must be of type "jump"')
 		else:
 			raise ValueError('unrecognized event of type %s' % currentEvent['type'])
 		

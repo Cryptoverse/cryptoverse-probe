@@ -272,7 +272,6 @@ def probe(params=None):
 	try:
 		postResult = postRequest(starLogsUrl, generated)
 		if postResult == 200:
-			print 'adding to database'
 			database.addStarLog(generated)
 		if not silent:
 			print 'Posted starlog with response %s' % postResult

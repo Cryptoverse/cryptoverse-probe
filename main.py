@@ -8,8 +8,6 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 import requests
-import database
-import parameterUtil as putil
 
 autoRebuild = int(os.getenv('AUTO_REBUILD', '0')) == 1
 persistentFileName = 'persistent.json'
@@ -27,7 +25,6 @@ shipReward = None
 starLogsMaxLimit = None
 eventsMaxLimit = None
 chainsMaxLimit = None
-util = None
 persistentData = None
 
 def getGenesis():
@@ -266,23 +263,27 @@ def probe(params=None):
 		print 'Something went wrong when trying to post the generated starlog'
 
 def generateNextStarLog(height=None):
-	starLog = getGenesis()
+	nextStarLog = getGenesis()
 	if height:
 		if height < -1:
 			raise ValueError('Paremeter "height" is out of range')
 		if height != -1:
 			result = getRequest(chainsUrl, {'height': height})
 			if result:
-				starLog = result[0]
+				nextStarLog = result[0]
 			else:
 				raise ValueError('No starlog at specified height could be retrieved')
 	if not height:
 		result = getRequest(chainsUrl, {'height': height})
 		if result:
-			starLog = result[0]
-			height = starLog['height']
+			nextStarLog = result[0]
+			height = nextStarLog['height']
 	accountInfo = getAccount()[1]
 	
+	nextStarLog['events'] = []
+
+
+
 	rewardOutput = {
 		'index': 0,
 		'type': 'reward',
@@ -305,7 +306,7 @@ def generateNextStarLog(height=None):
 		'signature': None
 	}
 
-	if not util.isGenesisStarLog(starLog['hash']):
+	if not util.isGenesisStarLog(nextStarLog['hash']):
 		firstStarLog = getRequest(chainsUrl, {'height': 0})
 		# Until we have a way to select where to send your reward ships, just send them to the genesis block.
 		rewardOutput['star_system'] = firstStarLog[0]['hash']
@@ -313,23 +314,24 @@ def generateNextStarLog(height=None):
 	rewardEvent['hash'] = util.hashEvent(rewardEvent)
 	rewardEvent['signature'] = util.rsaSign(accountInfo['private_key'], rewardEvent['hash'])
 
-	starLog['events'] = [ rewardEvent ]
-	starLog['previous_hash'] = starLog['hash']
-	starLog['time'] = util.getTime()
-	starLog['nonce'] = 0
-	starLog['log_header'] = util.concatStarLogHeader(starLog)
-	starLog['height'] = height + 1
+	nextStarLog['events'].append(rewardEvent)
+	nextStarLog['previous_hash'] = nextStarLog['hash']
+	nextStarLog['time'] = util.getTime()
+	nextStarLog['nonce'] = 0
+	nextStarLog['events_hash'] = util.hashEvents(nextStarLog['events'])
+	nextStarLog['log_header'] = util.concatStarLogHeader(nextStarLog)
+	nextStarLog['height'] = 0 if height is None else height + 1
 	found = False
 	tries = 0
 	started = datetime.now()
 	lastCheckin = started
 
 	while not found and tries < sys.maxint:
-		starLog['nonce'] += 1
-		starLog = util.hashStarLog(starLog)
+		nextStarLog['nonce'] += 1
+		nextStarLog = util.hashStarLog(nextStarLog)
 		found = False
 		try:
-			validate.difficulty(int(starLog['difficulty']), starLog['hash'])
+			validate.difficulty(int(nextStarLog['difficulty']), nextStarLog['hash'])
 			found = True
 		except:
 			pass
@@ -345,7 +347,7 @@ def generateNextStarLog(height=None):
 	if not found:
 		print 'Unable to probe a new starlog'
 		return None
-	return starLog
+	return nextStarLog
 
 def sync(params=None):
 	silent = putil.retrieve(params, '-s', True, False)
@@ -522,6 +524,7 @@ def jump(params=None):
 	jumpEvent['hash'] = util.hashEvent(jumpEvent)
 	jumpEvent['signature'] = util.rsaSign(accountInfo['private_key'], jumpEvent['hash'])
 
+	print prettyJson(jumpEvent)
 	result = postRequest(eventsUrl, jumpEvent)
 	print 'Posted jump event with response %s' % result
 
@@ -545,8 +548,10 @@ if __name__ == '__main__':
 	os.environ['DIFFICULTY_START'] = str(difficultyStart)
 	os.environ['SHIP_REWARD'] = str(shipReward)
 
-	import util as util
+	import util
 	import validate
+	import database
+	import parameterUtil as putil
 
 	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart, shipReward)
 	

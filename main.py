@@ -537,6 +537,9 @@ def listDeployments(params=None):
 def jump(params=None):
 	originFragment = None
 	destinationFragment = None
+	verbose = putil.retrieve(params, '-v', True, False)
+	render = putil.retrieve(params, '-r', True, False)
+	abort = putil.retrieve(params, '-a', True, False)
 	count = None
 	if putil.hasAny(params):
 		if len(params) < 2:
@@ -544,7 +547,7 @@ def jump(params=None):
 			return
 		originFragment = params[0]
 		destinationFragment = params[1]
-		if len(params) == 3:
+		if 2 < len(params) and isinstance(params[2], int):
 			count = int(params[2])
 	else:
 		print 'Specify an origin and destination system'
@@ -799,7 +802,10 @@ if __name__ == '__main__':
 			'Jump ships from one system to another',
 			[
 				'Passing partial origin and destination hashes will jump all ships from the origin system',
-				'Passing partial origin and destination hashes along with a valid number of ships will jump that many from the origin system'
+				'Passing partial origin and destination hashes along with a valid number of ships will jump that many from the origin system',
+				'"-v" prints the jump to the console',
+				'"-r" renders the jump in an external plotter before executing it',
+				'"-a" aborts without posting jump to the server'
 			]
 		),
 		'pos': createCommand(

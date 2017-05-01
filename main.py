@@ -617,6 +617,82 @@ def systemDistance(params=None):
 		return
 	print 'Distance between [%s] and [%s] is %s' % (originHash[:6], destinationHash[:6], util.getDistance(originHash, destinationHash))
 
+def systemAverageDistances(params=None):
+	originHash = None
+	hashes = database.getStarLogHashes()
+	if putil.hasSingle(params):
+		originFragment = params[0]
+		originHash = putil.naturalMatch(originFragment, hashes)
+		if originHash is None:
+			print 'Unable to find an origin system containing %s' % originFragment
+			return
+	total = 0
+	count = 0
+	if originHash:
+		for currentHash in hashes:
+			if currentHash == originHash:
+				continue
+			total += util.getDistance(currentHash, originHash)
+			count += 1
+	else:
+		for currentHash in hashes:
+			hashes = hashes[1:]
+			for targetHash in hashes:
+				total += util.getDistance(currentHash, targetHash)
+				count += 1
+	if count == 0:
+		print 'No systems to get the average distances of'
+	else:
+		average = total / count
+		if originHash is None:
+			print 'Average distance between all systems is %s' % average
+		else:
+			print 'Average distance to system [%s] is %s' % (originHash[:6], average)
+
+def systemMaximumDistance(params=None):
+	systemMinMaxDistance(params)
+
+def systemMinimumDistance(params=None):
+	systemMinMaxDistance(params, False)
+
+def systemMinMaxDistance(params=None, calculatingMax=True):
+	modifier = 'Farthest' if calculatingMax else 'Nearest'
+	hashes = database.getStarLogHashes()
+	if hashes is None or len(hashes) == 1:
+		print 'Not enough systems to get the max distances of'
+		return
+	originHash = None
+	if putil.hasSingle(params):
+		originFragment = params[0]
+		originHash = putil.naturalMatch(originFragment, hashes)
+		if originHash is None:
+			print 'Unable to find an origin system containing %s' % originFragment
+			return
+	if originHash:
+		bestSystem = None
+		bestDistance = 0 if calculatingMax else 999999999
+		for currentHash in hashes:
+			if currentHash == originHash:
+				continue
+			dist = util.getDistance(originHash, currentHash)
+			if (calculatingMax and bestDistance < dist) or (not calculatingMax and dist < bestDistance):
+				bestSystem = currentHash
+				bestDistance = dist
+		print '%s system from [%s] is [%s], with a distance of %s' % (modifier, originHash[:6], bestSystem[:6], bestDistance)
+	else:
+		bestSystemOrigin = None
+		bestSystemDestination = None
+		bestDistance = 0 if calculatingMax else 999999999
+		for currentHash in hashes:
+			hashes = hashes[1:]
+			for targetHash in hashes:
+				dist = util.getDistance(currentHash, targetHash)
+				if (calculatingMax and bestDistance < dist) or (not calculatingMax and dist < bestDistance):
+					bestSystemOrigin = currentHash
+					bestSystemDestination = targetHash
+					bestDistance = dist
+		print '%s systems are [%s] and [%s], with a distance of %s' % (modifier, bestSystemOrigin[:6], bestSystemDestination[:6], bestDistance)
+
 if __name__ == '__main__':
 	print 'Starting probe...'
 	rules = getRequest(rulesUrl)
@@ -718,6 +794,30 @@ if __name__ == '__main__':
 			'Calculates the distance between the specified systems',
 			[
 				'Passing a partial origin and destination hash will calculate the distance between the best matching systems'
+			]
+		),
+		'avgdist': createCommand(
+			systemAverageDistances,
+			'Calculates the average distance between all systems',
+			[
+				'Passing no arguments will calculate the average distance between every system',
+				'Passing a partial origin will calculate the average distance to the best matching system'
+			]
+		),
+		'maxdist': createCommand(
+			systemMaximumDistance,
+			'Calculates the maximum distance between all systems',
+			[
+				'Passing no arguments will calculate the maximum distance between every system',
+				'Passing a partial origin will calculate the maximum distance to the best matching system'
+			]
+		),
+		'mindist': createCommand(
+			systemMinimumDistance,
+			'Calculates the minimum distance between all systems',
+			[
+				'Passing no arguments will calculate the minimum distance between every system',
+				'Passing a partial origin will calculate the minimum distance to the best matching system'
 			]
 		)
 	}

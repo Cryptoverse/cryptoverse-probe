@@ -552,13 +552,17 @@ def jump(params=None):
 	else:
 		print 'Specify an origin and destination system'
 		return
-	originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
+	hashes = database.getStarLogHashes()
+	originHash = putil.naturalMatch(originFragment, hashes)
 	if originHash is None:
 		print 'Unable to find an origin system containing %s' % originFragment
 		return
-	destinationHash = putil.naturalMatch(destinationFragment, database.getStarLogHashes(originHash))
+	destinationHash = putil.naturalMatch(destinationFragment, hashes)
 	if destinationHash is None:
-		print 'Unable to find a destination system containing %s in a chain with system [%s]' % (destinationFragment, originHash[:6])
+		print 'Unable to find a destination system containing %s' % destinationFragment
+		return
+	if not database.getStarLogsShareChain([originHash, destinationHash]):
+		print 'Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6])
 		return
 	accountInfo = getAccount()[1]
 	fleetHash = util.sha256(accountInfo['public_key'])
@@ -629,13 +633,17 @@ def systemDistance(params=None):
 		return
 	originFragment = params[0]
 	destinationFragment = params[1]
-	originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
+	hashes = database.getStarLogHashes()
+	originHash = putil.naturalMatch(originFragment, hashes)
 	if originHash is None:
 		print 'Unable to find an origin system containing %s' % originFragment
 		return
-	destinationHash = putil.naturalMatch(destinationFragment, database.getStarLogHashes(originHash))
+	destinationHash = putil.naturalMatch(destinationFragment, hashes)
 	if destinationHash is None:
-		print 'Unable to find a destination system containing %s in a chain with system [%s]' % (destinationFragment, originHash[:6])
+		print 'Unable to find a destination system containing %s' % destinationFragment
+		return
+	if not database.getStarLogsShareChain([originHash, destinationHash]):
+		print 'Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6])
 		return
 	print 'Distance between [%s] and [%s] is %s' % (originHash[:6], destinationHash[:6], util.getDistance(originHash, destinationHash))
 

@@ -129,6 +129,27 @@ def getStarLogHashes(systemHash=None, fromHighest=False):
 	finally:
 		connection.close()
 
+def getStarLogsShareChain(systemHashes):
+	highest = None
+	lowest = None
+	for currentHash in systemHashes:
+		currentSystem = getStarLog(currentHash)
+		if highest is None or highest['height'] < currentSystem['height']:
+			highest = currentSystem
+		if lowest is None or currentSystem['height'] < lowest['height']:
+			lowest = currentSystem
+	if None in [highest, lowest]:
+		return False
+	previousHash = highest['previous_hash']
+	while not util.isGenesisStarLog(previousHash):
+		currentSystem = getStarLog(previousHash)
+		if currentSystem['height'] <= lowest['height']:
+			return False
+		if currentSystem['previous_hash'] == lowest['hash']:
+			return True
+		previousHash = currentSystem['previous_hash']
+	return False
+
 def getUnusedEvents(fromStarLog=None, systemHash=None, fleetHash=None):
 	if fromStarLog is None:
 		fromStarLog = getStarLogHighest(systemHash)['hash']

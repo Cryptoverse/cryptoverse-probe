@@ -491,8 +491,10 @@ def renderSystems(params=None):
 		ys = [ currentPosition[1], currentPosition[1] ]
 		zs = [ 0, currentPosition[2] ]
 		axes.plot(xs, ys, zs)
-		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2])
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=currentSystem[:6])
 	
+	axes.legend()
+	axes.set_title('Systems')
 	axes.set_xlabel('X')
 	axes.set_ylabel('Y')
 	axes.set_zlabel('Z')
@@ -612,9 +614,41 @@ def jump(params=None):
 	jumpEvent['hash'] = util.hashEvent(jumpEvent)
 	jumpEvent['signature'] = util.rsaSign(accountInfo['private_key'], jumpEvent['hash'])
 
-	print prettyJson(jumpEvent)
-	result = postRequest(eventsUrl, jumpEvent)
-	print 'Posted jump event with response %s' % result
+	if verbose:
+		print prettyJson(jumpEvent)
+	if render:
+		renderJump(originHash, destinationHash)
+	if not abort:
+		result = postRequest(eventsUrl, jumpEvent)
+		print 'Posted jump event with response %s' % result
+
+def renderJump(originHash, destinationHash):
+	higher = database.getStarLogHighestFromList([originHash, destinationHash])
+	
+	figure = pyplot.figure()
+	axes = figure.add_subplot(111, projection='3d')
+
+	for currentSystem in database.getStarLogHashes(higher):
+		currentPosition = util.getCartesian(currentSystem)
+		xs = [ currentPosition[0], currentPosition[0] ]
+		ys = [ currentPosition[1], currentPosition[1] ]
+		zs = [ 0, currentPosition[2] ]
+		axes.plot(xs, ys, zs)
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=currentSystem[:6])
+	originPosition = util.getCartesian(originHash)
+	destinationPosition = util.getCartesian(destinationHash)
+	xs = [ originPosition[0], destinationPosition[0] ]
+	ys = [ originPosition[1], destinationPosition[1] ]
+	zs = [ originPosition[2], destinationPosition[2] ]
+	axes.plot(xs, ys, zs, linestyle=':')
+	
+	axes.legend()
+	axes.set_title('Jump [%s] -> [%s]' % (originHash[:6], destinationHash[:6]))
+	axes.set_xlabel('X')
+	axes.set_ylabel('Y')
+	axes.set_zlabel('Z')
+
+	pyplot.show()
 
 def systemPosition(params=None):
 	if not putil.hasSingle(params):

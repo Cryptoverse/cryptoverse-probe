@@ -129,6 +129,14 @@ def getStarLogHashes(systemHash=None, fromHighest=False):
 	finally:
 		connection.close()
 
+def getStarLogHighestFromList(systemHashes):
+	highest = None
+	for currentHash in systemHashes:
+		currentSystem = getStarLog(currentHash)
+		if highest is None or highest['height'] < currentSystem['height']:
+			highest = currentSystem
+	return highest['hash']
+
 def getStarLogsShareChain(systemHashes):
 	highest = None
 	lowest = None

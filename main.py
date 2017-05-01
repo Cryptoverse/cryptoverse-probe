@@ -7,6 +7,9 @@ from datetime import datetime
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as pyplot
+import numpy
 import requests
 
 autoRebuild = int(os.getenv('AUTO_REBUILD', '0')) == 1
@@ -478,6 +481,24 @@ def renderChain(params=None):
 		
 	print tree
 
+def renderSystems(params=None):
+	figure = pyplot.figure()
+	axes = figure.add_subplot(111, projection='3d')
+
+	for currentSystem in database.getStarLogHashes():
+		currentPosition = util.getCartesian(currentSystem)
+		xs = [ currentPosition[0], currentPosition[0] ]
+		ys = [ currentPosition[1], currentPosition[1] ]
+		zs = [ 0, currentPosition[2] ]
+		axes.plot(xs, ys, zs)
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2])
+
+	axes.set_xlabel('X')
+	axes.set_ylabel('Y')
+	axes.set_zlabel('Z')
+
+	pyplot.show()
+
 def listDeployments(params=None):
 	hashQuery = None
 	verbose = False
@@ -766,6 +787,10 @@ if __name__ == '__main__':
 				'Passing no arguments renders the highest chains and their siblings',
 				'Passing an integer greater than zero renders that many chains'
 			]
+		),
+		'rsys': createCommand(
+			renderSystems,
+			'Render systems in an external plotter'
 		),
 		'ldeploy': createCommand(
 			listDeployments,

@@ -44,11 +44,47 @@ def getStarLogLatest():
 	finally:
 		connection.close()
 
-def getStarLogHighest():
+def getStarLogChildren(systemHash):
 	connection, cursor = begin()
 	try:
-		result = cursor.execute('SELECT json FROM star_logs ORDER BY height DESC').fetchone()
-		return None if result is None else json.loads(result[0])
+		results = []
+		children = cursor('SELECT json FROM star_logs WHERE previous_hash=?', (systemHash,)).fetchall()
+		for child in children:
+			results.append(json.loads(child[0]))
+		return results
+	finally:
+		connection.close()
+
+def getStarLogHighest(systemHash=None):
+	connection, cursor = begin()
+	try:
+		if systemHash:
+			targetSystem = getStarLog(systemHash)
+			if targetSystem is None:
+				return None
+			checked = []
+			highestChild = None
+			results = cursor.execute('SELECT hash, previous_hash, height, json FROM star_logs WHERE height > ? ORDER BY height DESC', (targetSystem['height'],)).fetchall()
+			for entry in results:
+				if entry[0] in checked:
+					continue
+				checked.append(entry[0])
+				previousHash = entry[1]
+				while previousHash != systemHash:
+					currentParent = getStarLog(previousHash)
+					if currentParent['hash'] in checked:
+						break
+					checked.append(currentParent['hash'])
+					if currentParent['height'] <= targetSystem['height']:
+						break
+					previousHash = currentParent['hash']
+				if previousHash == systemHash:
+					highestChild = json.loads(entry[3])
+					break
+			return targetSystem if highestChild is None else highestChild
+		else:
+			result = cursor.execute('SELECT json FROM star_logs ORDER BY height DESC').fetchone()
+			return None if result is None else json.loads(result[0])
 	finally:
 		connection.close()
 
@@ -71,23 +107,34 @@ def getStarLogsAtHight(height, limit):
 	finally:
 		connection.close()
 
-def getStarLogHashes():
+def getStarLogHashes(systemHash=None, fromHighest=False):
 	connection, cursor = begin()
 	try:
-		fetched = cursor.execute('SELECT hash FROM star_logs').fetchall()
-		hashes = []
-		for entry in fetched:
-			hashes.append(entry[0])
-		return hashes
+		if fromHighest:
+			systemHash = getStarLogHighest()['hash']
+
+		if systemHash:
+			lastHash = systemHash if fromHighest else getStarLogHighest(systemHash)['hash']
+			results = []
+			while not util.isGenesisStarLog(lastHash):
+				results.append(lastHash)
+				lastHash = getStarLog(lastHash)['previous_hash']
+			return results
+		else:
+			fetched = cursor.execute('SELECT hash FROM star_logs').fetchall()
+			results = []
+			for entry in fetched:
+				results.append(entry[0])
+			return results
 	finally:
 		connection.close()
 
 def getUnusedEvents(fromStarLog=None, systemHash=None, fleetHash=None):
 	if fromStarLog is None:
-		fromStarLog = getStarLogHighest()['hash']
+		fromStarLog = getStarLogHighest(systemHash)['hash']
 	usedEvents = []
 	results = []
-	while fromStarLog is not None and not util.isGenesisStarLog(fromStarLog):
+	while not util.isGenesisStarLog(fromStarLog):
 		system = getStarLog(fromStarLog)
 		for event in system['events']:
 			if event['type'] not in util.shipEventTypes:
@@ -111,7 +158,7 @@ def getUnusedEvents(fromStarLog=None, systemHash=None, fleetHash=None):
 def anyEventsExist(events, fromStarLog=None):
 	if fromStarLog is None:
 		fromStarLog = getStarLogHighest()['hash']
-	while fromStarLog is not None and not util.isGenesisStarLog(fromStarLog):
+	while not util.isGenesisStarLog(fromStarLog):
 		system = getStarLog(fromStarLog)
 		for event in system['events']:
 			for eventEntry in event['inputs'] + event['outputs']:
@@ -123,7 +170,7 @@ def anyEventsExist(events, fromStarLog=None):
 def anyEventsUsed(events, fromStarLog=None):
 	if fromStarLog is None:
 		fromStarLog = getStarLogHighest()['hash']
-	while fromStarLog is not None and not util.isGenesisStarLog(fromStarLog):
+	while not util.isGenesisStarLog(fromStarLog):
 		system = getStarLog(fromStarLog)
 		for event in system['events']:
 			for eventEntry in event['inputs']:

@@ -485,14 +485,14 @@ def renderSystems(params=None):
 	figure = pyplot.figure()
 	axes = figure.add_subplot(111, projection='3d')
 
-	for currentSystem in database.getStarLogHashes():
+	for currentSystem in database.getStarLogHashes(fromHighest=True):
 		currentPosition = util.getCartesian(currentSystem)
 		xs = [ currentPosition[0], currentPosition[0] ]
 		ys = [ currentPosition[1], currentPosition[1] ]
 		zs = [ 0, currentPosition[2] ]
 		axes.plot(xs, ys, zs)
 		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2])
-
+	
 	axes.set_xlabel('X')
 	axes.set_ylabel('Y')
 	axes.set_zlabel('Z')
@@ -549,14 +549,13 @@ def jump(params=None):
 	else:
 		print 'Specify an origin and destination system'
 		return
-	hashes = database.getStarLogHashes()
-	originHash = putil.naturalMatch(originFragment, hashes)
-	destinationHash = putil.naturalMatch(destinationFragment, hashes)
+	originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
 	if originHash is None:
 		print 'Unable to find an origin system containing %s' % originFragment
 		return
+	destinationHash = putil.naturalMatch(destinationFragment, database.getStarLogHashes(originHash))
 	if destinationHash is None:
-		print 'Unable to find a destination system containing %s' % destinationFragment
+		print 'Unable to find a destination system containing %s in a chain with system [%s]' % (destinationFragment, originHash[:6])
 		return
 	accountInfo = getAccount()[1]
 	fleetHash = util.sha256(accountInfo['public_key'])
@@ -627,35 +626,34 @@ def systemDistance(params=None):
 		return
 	originFragment = params[0]
 	destinationFragment = params[1]
-	hashes = database.getStarLogHashes()
-	originHash = putil.naturalMatch(originFragment, hashes)
-	destinationHash = putil.naturalMatch(destinationFragment, hashes)
+	originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
 	if originHash is None:
 		print 'Unable to find an origin system containing %s' % originFragment
 		return
+	destinationHash = putil.naturalMatch(destinationFragment, database.getStarLogHashes(originHash))
 	if destinationHash is None:
-		print 'Unable to find a destination system containing %s' % destinationFragment
+		print 'Unable to find a destination system containing %s in a chain with system [%s]' % (destinationFragment, originHash[:6])
 		return
 	print 'Distance between [%s] and [%s] is %s' % (originHash[:6], destinationHash[:6], util.getDistance(originHash, destinationHash))
 
 def systemAverageDistances(params=None):
 	originHash = None
-	hashes = database.getStarLogHashes()
 	if putil.hasSingle(params):
 		originFragment = params[0]
-		originHash = putil.naturalMatch(originFragment, hashes)
+		originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
 		if originHash is None:
 			print 'Unable to find an origin system containing %s' % originFragment
 			return
 	total = 0
 	count = 0
 	if originHash:
-		for currentHash in hashes:
+		for currentHash in database.getStarLogHashes(originHash):
 			if currentHash == originHash:
 				continue
 			total += util.getDistance(currentHash, originHash)
 			count += 1
 	else:
+		hashes = database.getStarLogHashes(fromHighest=True)
 		for currentHash in hashes:
 			hashes = hashes[1:]
 			for targetHash in hashes:
@@ -678,21 +676,17 @@ def systemMinimumDistance(params=None):
 
 def systemMinMaxDistance(params=None, calculatingMax=True):
 	modifier = 'Farthest' if calculatingMax else 'Nearest'
-	hashes = database.getStarLogHashes()
-	if hashes is None or len(hashes) == 1:
-		print 'Not enough systems to get the max distances of'
-		return
 	originHash = None
 	if putil.hasSingle(params):
 		originFragment = params[0]
-		originHash = putil.naturalMatch(originFragment, hashes)
+		originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
 		if originHash is None:
 			print 'Unable to find an origin system containing %s' % originFragment
 			return
 	if originHash:
 		bestSystem = None
 		bestDistance = 0 if calculatingMax else 999999999
-		for currentHash in hashes:
+		for currentHash in database.getStarLogHashes(originHash):
 			if currentHash == originHash:
 				continue
 			dist = util.getDistance(originHash, currentHash)
@@ -701,6 +695,7 @@ def systemMinMaxDistance(params=None, calculatingMax=True):
 				bestDistance = dist
 		print '%s system from [%s] is [%s], with a distance of %s' % (modifier, originHash[:6], bestSystem[:6], bestDistance)
 	else:
+		hashes = database.getStarLogHashes(fromHighest=True)
 		bestSystemOrigin = None
 		bestSystemDestination = None
 		bestDistance = 0 if calculatingMax else 999999999

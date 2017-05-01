@@ -514,27 +514,29 @@ def listDeployments(params=None):
 	print result
 
 def jump(params=None):
-	originHash = None
-	destinationHash = None
+	originFragment = None
+	destinationFragment = None
 	count = None
 	if putil.hasAny(params):
 		if len(params) < 2:
 			print 'An origin and destination system must be specified'
 			return
-		originHash = params[0]
-		destinationHash = params[1]
+		originFragment = params[0]
+		destinationFragment = params[1]
 		if len(params) == 3:
 			count = int(params[2])
 	else:
 		print 'Specify an origin and destination system'
 		return
 	hashes = database.getStarLogHashes()
-	originHash = putil.naturalMatch(originHash, hashes)
-	destinationHash = putil.naturalMatch(destinationHash, hashes)
+	originHash = putil.naturalMatch(originFragment, hashes)
+	destinationHash = putil.naturalMatch(destinationFragment, hashes)
 	if originHash is None:
-		print 'Unable to find an origin system containing %s' % originHash
+		print 'Unable to find an origin system containing %s' % originFragment
+		return
 	if destinationHash is None:
-		print 'Unable to find a destination system containing %s' % destinationHash
+		print 'Unable to find a destination system containing %s' % destinationFragment
+		return
 	accountInfo = getAccount()[1]
 	fleetHash = util.sha256(accountInfo['public_key'])
 	deployments = database.getUnusedEvents(systemHash=originHash, fleetHash=fleetHash)
@@ -586,6 +588,34 @@ def jump(params=None):
 	print prettyJson(jumpEvent)
 	result = postRequest(eventsUrl, jumpEvent)
 	print 'Posted jump event with response %s' % result
+
+def systemPosition(params=None):
+	if not putil.hasSingle(params):
+		print 'An origin system must be specified'
+		return
+	originFragment = putil.singleStr(params)
+	originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
+	if originHash is None:
+		print 'Unable to find an origin system containing %s' % originFragment
+		return
+	print '[%s] system is at %s' % (originHash[:6], util.getCartesian(originHash))
+
+def systemDistance(params=None):
+	if not putil.hasCount(params, 2):
+		print 'An origin and destination system must be specified'
+		return
+	originFragment = params[0]
+	destinationFragment = params[1]
+	hashes = database.getStarLogHashes()
+	originHash = putil.naturalMatch(originFragment, hashes)
+	destinationHash = putil.naturalMatch(destinationFragment, hashes)
+	if originHash is None:
+		print 'Unable to find an origin system containing %s' % originFragment
+		return
+	if destinationHash is None:
+		print 'Unable to find a destination system containing %s' % destinationFragment
+		return
+	print 'Distance between [%s] and [%s] is %s' % (originHash[:6], destinationHash[:6], util.getDistance(originHash, destinationHash))
 
 if __name__ == '__main__':
 	print 'Starting probe...'
@@ -674,6 +704,20 @@ if __name__ == '__main__':
 			[
 				'Passing partial origin and destination hashes will jump all ships from the origin system',
 				'Passing partial origin and destination hashes along with a valid number of ships will jump that many from the origin system'
+			]
+		),
+		'pos': createCommand(
+			systemPosition,
+			'Calculates the coordinates of the specified system',
+			[
+				'Passing a partial hash will calculate the coordinate of the best matching system'
+			]
+		),
+		'dist': createCommand(
+			systemDistance,
+			'Calculates the distance between the specified systems',
+			[
+				'Passing a partial origin and destination hash will calculate the distance between the best matching systems'
 			]
 		)
 	}

@@ -2,6 +2,8 @@ import os
 import hashlib
 import binascii
 import time
+import math
+import numpy
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -367,6 +369,44 @@ def getEventTypeName(eventId):
 		str: Str of the event type.
 	'''
 	return eventTypes[eventId] if eventId is not None and eventId < len(eventTypes) else eventTypes[0]
+
+def getJumpCost(originHash, destinationHash):
+	'''Gets the floating point scalar for the number of ships that will be lost in this jump.
+
+	Args:
+		originHash (str): The starting hash of the jump.
+		destinationHash (str): The ending hash of the jump.
+	
+	Returns:
+		float: A scalar value of the ships lost in the jump.
+	'''
+	raise Exception('Not implemented')
+
+def getCartesian(systemHash):
+	'''Gets the (x, y, z) position of the specified system.
+
+	Args:
+		systemHash (str): The system's Sha256 hash.
+	
+	Returns:
+		array: A list containing the (x, y, z) position.
+	'''
+	cartesian = systemHash[-9:]
+	return numpy.array([int(cartesian[:3], 16), int(cartesian[3:-3], 16), int(cartesian[6:], 16)])
+
+def getDistance(originHash, destinationHash):
+	'''Gets the distance between the specified systems in cartesian space.
+
+	Args:
+		originHash (str): The origin system's Sha256 hash.
+		destinationHash (str): The destination system's Sha256 hash.
+	
+	Returns:
+		float: The distance between the two systems.
+	'''
+	originPos = getCartesian(originHash)
+	destinationPos = getCartesian(destinationHash)
+	return int(math.ceil(numpy.linalg.norm(originPos - destinationPos)))
 
 def getTime():
 	'''UTC time in seconds.

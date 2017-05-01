@@ -1,6 +1,9 @@
 def hasAny(params):
 	return params and 0 < len(params)
 
+def hasCount(params, count):
+	return len(params) == count
+
 def hasSingle(params):
 	return params and hasAny(params) and len(params) == 1
 

@@ -11,16 +11,87 @@ def begin():
 	return connection, cursor
 
 def initialize(rebuild=False):
-	exists = os.path.isfile(databaseFileName)
-	if rebuild and exists:
-		os.remove(databaseFileName)
-		exists = False
-	if exists:
-		return
-	
 	connection, cursor = begin()
 	try:
-		cursor.execute('''CREATE TABLE star_logs (hash, previous_hash, height, time, json)''')
+		if rebuild:
+			cursor.execute('''DROP TABLE IF EXISTS star_logs''')	
+		cursor.execute('''CREATE TABLE IF NOT EXISTS star_logs (hash, previous_hash, height, time, json)''')
+		cursor.execute('''CREATE TABLE IF NOT EXISTS accounts (active, name, private_key, public_key)''')
+		connection.commit()
+	finally:
+		connection.close()
+
+def getAccount(name=None):
+	connection, cursor = begin()
+	try:
+		result = None
+		if name:
+			result = cursor.execute('SELECT * FROM accounts WHERE name=?', (name,)).fetchone()
+		else:
+			result = cursor.execute('SELECT * FROM accounts WHERE active=1').fetchone()
+		if result:
+			return {
+				'active': result[0] == 1,
+				'name': result[1],
+				'private_key': result[2],
+				'public_key': result[3]
+			}
+		return None
+	finally:
+		connection.close()
+
+def getAccounts():
+	connection, cursor = begin()
+	try:
+		results = []
+		fetched = cursor.execute('SELECT * FROM accounts').fetchall()
+		if fetched:
+			for account in fetched:
+				results.append({
+					'active': account[0] == 1,
+					'name': account[1],
+					'private_key': account[2],
+					'public_key': account[3]
+				})
+		return results
+	finally:
+		connection.close()
+
+def anyAccount(name):
+	return getAccount(name) != None
+
+def addAccount(accountJson):
+	connection, cursor = begin()
+	try:
+		if cursor.execute('SELECT * FROM accounts WHERE name=?', (accountJson['name'],)).fetchone():
+			return
+		
+		cursor.execute('INSERT INTO accounts VALUES (?, ?, ?, ?)', (0, accountJson['name'], accountJson['private_key'], accountJson['public_key']))
+		connection.commit()
+	finally:
+		connection.close()
+
+def setAccountActive(name):
+	connection, cursor = begin()
+	try:
+		cursor.execute('UPDATE accounts SET active=0')
+		cursor.execute('UPDATE accounts SET active=1 WHERE name=?', (name,))
+		connection.commit()
+	finally:
+		connection.close()
+
+def dropAccount(name):
+	connection, cursor = begin()
+	try:
+		cursor.execute('DELETE FROM accounts WHERE name=?', (name,))
+		connection.commit()
+	finally:
+		connection.close()
+
+def dropAccounts():
+	connection, cursor = begin()
+	try:
+		cursor.execute('DELETE FROM accounts')
 		connection.commit()
 	finally:
 		connection.close()
@@ -150,11 +221,11 @@ def getStarLogsShareChain(systemHashes):
 		return False
 	previousHash = highest['previous_hash']
 	while not util.isGenesisStarLog(previousHash):
+		if previousHash == lowest['hash']:
+			return True
 		currentSystem = getStarLog(previousHash)
 		if currentSystem['height'] <= lowest['height']:
 			return False
-		if currentSystem['previous_hash'] == lowest['hash']:
-			return True
 		previousHash = currentSystem['previous_hash']
 	return False
 

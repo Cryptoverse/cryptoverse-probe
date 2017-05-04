@@ -1,19 +1,17 @@
+import sys
 import traceback
 import os
 import json
-import sys
-from ete3 import Tree
 from datetime import datetime
+from ete3 import Tree
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
-from mpl_toolkits.mplot3d import Axes3D
+from getch import getch
 import matplotlib.pyplot as pyplot
-import numpy
 import requests
 
 autoRebuild = int(os.getenv('AUTO_REBUILD', '0')) == 1
-persistentFileName = 'persistent.json'
 hostUrl = os.getenv('HOST_URL', 'http://localhost:5000')
 rulesUrl = hostUrl + '/rules'
 chainsUrl = hostUrl + '/chains'
@@ -28,7 +26,6 @@ shipReward = None
 starLogsMaxLimit = None
 eventsMaxLimit = None
 chainsMaxLimit = None
-persistentData = None
 
 def getGenesis():
 	return {
@@ -59,24 +56,7 @@ def getEventOutput(index, count, fleetHash, key, starSystem, typeName):
 		'type': typeName
 	}
 
-def loadPersistent():
-	if os.path.isfile(persistentFileName):
-		with open(persistentFileName) as persistentFile:
-			return json.load(persistentFile)
-	return None
-
-def savePersistent(serialized):
-	persistentFile = open(persistentFileName, 'w')
-	persistentFile.write(prettyJson(serialized))
-	persistentFile.close()
-
-def generatePersistent():
-	return {
-		'current_account': 'default',
-		'accounts': { 'default': generateAccount() }
-	}
-
-def generateAccount():
+def generateAccount(name='default'):
 	privateKey = rsa.generate_private_key(
 		public_exponent=65537,
 		key_size=2048,
@@ -91,16 +71,13 @@ def generateAccount():
 		encoding=serialization.Encoding.PEM,
 		format=serialization.PublicFormat.SubjectPublicKeyInfo
 	)
-	# privateLines = privateSerialized.splitlines()
-	# privateShrunk = ''
-	# for line in range(0, len(privateLines)):
-	# 	privateShrunk += privateLines[line].strip('\n')
 	publicLines = publicSerialized.splitlines()
 	publicShrunk = ''
 	for line in range(1, len(publicLines) - 1):
 		publicShrunk += publicLines[line].strip('\n')
 	
 	return {
+		'name': name,
 		'private_key': privateSerialized,
 		'public_key': publicShrunk
 	}
@@ -150,7 +127,7 @@ def commandHelp(commands, params=None):
 			elif queriedCommandName == 'exit':
 				print exitMessage % ''
 				return
-			print 'Command "%s" is not recognized, try typing "help" for a list of all commands'
+			print 'Command "%s" is not recognized, try typing "help" for a list of all commands' % queriedCommandName
 			return
 
 	print helpMessage % 'help\t - '
@@ -158,84 +135,38 @@ def commandHelp(commands, params=None):
 		print '%s\t - %s' % (curr, commands[curr]['description'])
 	print exitMessage % 'exit\t - '
 
-def getAccount(name=None):
-	if persistentData:
-		accountName = name if name else persistentData['current_account']
-		if accountName:
-			accounts = persistentData['accounts']
-			if accounts:
-				currentAccount = accounts.get(accountName, None)
-				if currentAccount:
-					return (accountName, currentAccount)
-	return None
-
 def account(params=None):
-	if params:
-		paramCount = len(params)
-		if paramCount == 1:
-			primaryParam = params[0]
-			if primaryParam == 'all':
-				accountAll()
-				return
-			if primaryParam == 'clear':
-				accountClear()
-				return
-		elif paramCount == 2:
-			primaryParam = params[0]
-			secondaryParam = params[1]
-			if primaryParam == 'set':
-				accountSet(secondaryParam)
-				return
-		allParams = ''
-		for param in params:
-			allParams += ' %s' % param
-		print 'Unrecognized parameters "%s"' % allParams
+	if putil.retrieve(params, '-a', True, False):
+		accountAll()
+	elif putil.retrieve(params, '-s', True, False):
+		accountSet(putil.retrieveValue(params, '-s', None))
 	else:
-		result = getAccount()
+		result = database.getAccount()
 		if result:
-			accountName = result[0]
-			currentAccount = result[1]
-			print 'Using account "%s"' % accountName
-			print '\tPrivate Key: %s...' % currentAccount['private_key'][:16]
-			print '\tPublic Key:  %s...' % currentAccount['public_key'][:16]
+			print 'Using account "%s"' % result['name']
+			print '\tPublic Key:  %s...' % result['public_key'][:16]
 		else:
 			print 'No active account'
 
 def accountAll():
-	message = 'No account information stored in %s' % persistentFileName
-	if persistentData and persistentData['accounts']:
-		currentAccount = persistentData['current_account']
-		keys = persistentData['accounts'].keys()
-		if 0 < len(keys):
-			message = 'Persistent data contains the following account entries'
-			entryMessage = '\n%s\t- %s\n\t\tPrivate Key: %s...\n\t\tPublic Key:  %s...'
-			for key in keys:
-				currentEntry = persistentData['accounts'][key]
-				activeFlag = '[CURR] ' if currentAccount == key else ''
-				message += entryMessage % (activeFlag, key, currentEntry['private_key'][:16], currentEntry['public_key'][:16])
+	message = 'No account information found'
+	accounts = database.getAccounts()
+	if accounts:
+		message = 'Persistent data contains the following account entries'
+		entryMessage = '\n%s\t- %s\n\t\tPublic Key:  %s...'
+		for currentAccount in accounts:
+			activeFlag = '[CURR] ' if currentAccount['active'] else ''
+			message += entryMessage % (activeFlag, currentAccount['name'], currentAccount['public_key'][:16])
 	print message
-
-def accountClear():
-	if persistentData:
-		persistentData['current_account'] = None
-		savePersistent(persistentData)
-		print 'Current account is now disabled'
-	else:
-		print 'No account information stored in %s' % persistentFileName
 
 def accountSet(name):
 	if not name:
-		print 'Account can not be set to None, try "account clear"'
-	if persistentData and persistentData['accounts']:
-		if name in persistentData['accounts'].keys():
-			persistentData['current_account'] = name
-			savePersistent(persistentData)
-			print 'Current account is now "%s"' % name
-			return
-		else:
-			print 'Account "%s" cannot be found' % name
-			return
-	print 'No account information stored in %s' % persistentFileName
+		print 'Account cannot be set to None'
+	if not database.anyAccount(name):
+		print 'Unable to find account %s' % name
+		return
+	database.setAccountActive(name)
+	print 'Current account is now "%s"' % name
 
 def info():
 	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration) 
@@ -303,7 +234,7 @@ def generateNextStarLog(fromStarLog=None, height=None, allowDuplicateEvents=Fals
 			nextStarLog = result[0]
 			height = nextStarLog['height']
 	isGenesis = util.isGenesisStarLog(nextStarLog['hash'])
-	accountInfo = getAccount()[1]
+	accountInfo = database.getAccount()
 	nextStarLog['events'] = []
 
 	if not isGenesis:
@@ -566,7 +497,7 @@ def jump(params=None):
 	if not database.getStarLogsShareChain([originHash, destinationHash]):
 		print 'Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6])
 		return
-	accountInfo = getAccount()[1]
+	accountInfo = database.getAccount()
 	fleetHash = util.sha256(accountInfo['public_key'])
 	deployments = database.getUnusedEvents(systemHash=originHash, fleetHash=fleetHash)
 	totalShips = 0
@@ -754,31 +685,70 @@ def systemMinMaxDistance(params=None, calculatingMax=True):
 					bestDistance = dist
 		print '%s systems are [%s] and [%s], with a distance of %s' % (modifier, bestSystemOrigin[:6], bestSystemDestination[:6], bestDistance)
 
-if __name__ == '__main__':
-	print 'Starting probe...'
-	rules = getRequest(rulesUrl)
-	if not rules:
-		raise ValueError('null rules')
-	difficultyFudge = rules['difficulty_fudge']
-	difficultyInterval = rules['difficulty_interval']
-	difficultyDuration = rules['difficulty_duration']
-	difficultyStart = rules['difficulty_start']
-	shipReward = rules['ship_reward']
-	starLogsMaxLimit = rules['star_logs_max_limit']
-	eventsMaxLimit = rules['events_max_limit']
-	chainsMaxLimit = rules['chains_max_limit']
+def pollInput():
+	returnSequence = [ 13 ]
+	upSequence = [ 27, 91, 65 ]
+	downSequence = [ 27, 91, 66 ]
+	leftSequence = [ 27, 91, 68 ]
+	rightSequence = [ 27, 91, 67 ]
+	backSequence = [ 127 ]
+	controlCSequence = [ 3 ]
 
-	os.environ['DIFFICULTY_FUDGE'] = str(difficultyFudge)
-	os.environ['DIFFICULTY_INTERVAL'] = str(difficultyInterval)
-	os.environ['DIFFICULTY_DURATION'] = str(difficultyDuration)
-	os.environ['DIFFICULTY_START'] = str(difficultyStart)
-	os.environ['SHIP_REWARD'] = str(shipReward)
+	specialSequences = [
+		returnSequence,
+		upSequence,
+		downSequence,
+		leftSequence,
+		rightSequence,
+		backSequence,
+		controlCSequence
+	]
+	alphaNumericRange = range(32, 127)
+	isSpecial = True
+	chars = []
+	while True:
+		isSpecial = chars in specialSequences
+		if isSpecial:
+			break
+		char = ord(getch())
+		chars.append(char)
+		if len(chars) == 1 and char in alphaNumericRange:
+			break
+	
+	alphaNumeric = ''
+	isReturn = False
+	isBackspace = False
+	isControlC = False
+	isUp = False
+	isDown = False
+	isLeft = False
+	isRight = False
 
-	import util
-	import validate
-	import database
-	import parameterUtil as putil
+	if isSpecial:
+		if chars == returnSequence:
+			isReturn = True
+		elif chars == backSequence:
+			isBackspace = True
+		elif chars == controlCSequence:
+			isControlC = True
+		elif chars == upSequence:
+			isUp = True
+		elif chars == downSequence:
+			isDown = True
+		elif chars == leftSequence:
+			isLeft = True
+		elif chars == rightSequence:
+			isRight = True
+		else:
+			print 'Unrecognized special sequence %s' % chars
+	elif len(chars) == 1:
+		alphaNumeric = chr(chars[0])
+	else:
+		print 'Unrecognized alphanumeric sequence %s' % chars
+	
+	return alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight
 
+def main():
 	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart, shipReward)
 	
 	if autoRebuild:
@@ -787,6 +757,14 @@ if __name__ == '__main__':
 	database.initialize(autoRebuild)
 
 	sync()
+
+	if not database.getAccounts():
+		print 'Unable to find existing accounts, creating default...'
+		defaultAccount = generateAccount()
+		database.addAccount(defaultAccount)
+		database.setAccountActive(defaultAccount['name'])
+	elif database.getAccount() is None:
+		print 'No active account, try "help account" for more information on selecting an active account'
 
 	allCommands = {
 		'info': createCommand(
@@ -805,8 +783,8 @@ if __name__ == '__main__':
 				'"-g" probes for a new genesis starlog', 
 				'"-v" prints the probed starlog to the console',
 				'"-s" silently executes the command',
-				'"-a" aborts without posting starlog to the server'
-				'"-d" allow duplicate events'
+				'"-a" aborts without posting starlog to the server',
+				'"-d" allow duplicate events',
 				'"-f" probes for a starlog ontop of the best matching system'
 			]
 		),
@@ -815,9 +793,8 @@ if __name__ == '__main__':
 			'Information about the current account',
 			[
 				'Passing no arguments gets the current account information',
-				'Passing "all" lists all accounts stored in persistent data',
-				'Passing "set" followed by an account name changes the current account to the specified one',
-				'Passing "clear" disables any active accounts'
+				'"-a" lists all accounts stored in persistent data',
+				'"-s" followed by an account name changes the current account to the specified one'
 			]
 		),
 		'rchain': createCommand(
@@ -890,22 +867,59 @@ if __name__ == '__main__':
 		)
 	}
 	
-	exited = False
-	
-	persistentData = loadPersistent()
+	commandPrefix = '> '
+	command = None
+	commandIndex = 0
+	while True:
+		
+		if command is None:
+			command = ''
+			sys.stdout.write('\r%s%s\033[K' % (commandPrefix, command))
+			sys.stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
 
-	if not persistentData:
-		print 'A persistent data file must be created in this directory to continue, would you like to do that now?'
-		command = raw_input('(y / n) > ')
-		if command == 'y' or command == 'yes':
-			persistentData = generatePersistent()
-			savePersistent(persistentData)
-			print 'Generated a new %s file with a new RSA key'
+		alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight = pollInput()
+		oldCommandIndex = commandIndex
+		oldCommand = command
+		
+		if isBackspace:
+			if 0 < commandIndex:
+				if len(command) == commandIndex:
+					# We're at the end of the string
+					command = command[:-1]
+				else:
+					# We're in the middle of a string
+					command = command[:commandIndex] + command[commandIndex + 1:]
+				commandIndex -= 1
+		elif isControlC:
+			break
+		elif isUp:
+			pass
+		elif isDown:
+			command = ''
+			commandIndex = 0
+		elif isLeft:
+			if 0 < commandIndex:
+				commandIndex -= 1
+		elif isRight:
+			if commandIndex < len(command):
+				commandIndex += 1
 		else:
-			exited = True
-	
-	while not exited:
-		command = raw_input('> ')
+			if len(command) == commandIndex:
+				command += alphaNumeric
+			else:
+				command = command[:commandIndex] + alphaNumeric + command[commandIndex:]
+			commandIndex += 1
+
+		if oldCommand != command:
+			sys.stdout.write('\r%s%s\033[K' % (commandPrefix, command))
+		if oldCommandIndex != commandIndex:
+			sys.stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
+
+		if isReturn:
+			sys.stdout.write('\n')
+		else:
+			continue
+
 		try:
 			if not command:
 				print 'Type help for more commands'
@@ -918,7 +932,7 @@ if __name__ == '__main__':
 				if commandName == 'help':
 					commandHelp(allCommands, commandArgs)
 				elif commandName == 'exit':
-					exited = True
+					break
 				else:
 					print 'No command "%s" found, try typing help for more commands' % command
 			else:
@@ -928,5 +942,33 @@ if __name__ == '__main__':
 					selectedCommand['function'](commandArgs)
 		except:
 			traceback.print_exc()
-			print 'Error with your last command'	
-	print 'Exiting...'
+			print 'Error with your last command'
+		command = None
+		commandIndex = 0
+
+if __name__ == '__main__':
+	print 'Starting probe...'
+	rules = getRequest(rulesUrl)
+	if not rules:
+		raise ValueError('null rules')
+	difficultyFudge = rules['difficulty_fudge']
+	difficultyInterval = rules['difficulty_interval']
+	difficultyDuration = rules['difficulty_duration']
+	difficultyStart = rules['difficulty_start']
+	shipReward = rules['ship_reward']
+	starLogsMaxLimit = rules['star_logs_max_limit']
+	eventsMaxLimit = rules['events_max_limit']
+	chainsMaxLimit = rules['chains_max_limit']
+
+	os.environ['DIFFICULTY_FUDGE'] = str(difficultyFudge)
+	os.environ['DIFFICULTY_INTERVAL'] = str(difficultyInterval)
+	os.environ['DIFFICULTY_DURATION'] = str(difficultyDuration)
+	os.environ['DIFFICULTY_START'] = str(difficultyStart)
+	os.environ['SHIP_REWARD'] = str(shipReward)
+
+	import util
+	import validate
+	import database
+	import parameterUtil as putil
+	main()
+	sys.stdout.write('\nExiting...\n')

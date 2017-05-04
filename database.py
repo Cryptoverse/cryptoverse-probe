@@ -4,6 +4,7 @@ import json
 import util
 
 databaseFileName = 'local.db'
+commandHistoryLimit = int(os.getenv('COMMAND_HISTORY', '100'))
 
 def begin():
 	connection = sqlite3.connect(databaseFileName)
@@ -14,10 +15,40 @@ def initialize(rebuild=False):
 	connection, cursor = begin()
 	try:
 		if rebuild:
-			cursor.execute('''DROP TABLE IF EXISTS star_logs''')	
+			cursor.execute('''DROP TABLE IF EXISTS star_logs''')
 		cursor.execute('''CREATE TABLE IF NOT EXISTS star_logs (hash, previous_hash, height, time, json)''')
 		cursor.execute('''CREATE TABLE IF NOT EXISTS accounts (active, name, private_key, public_key)''')
+		cursor.execute('''CREATE TABLE IF NOT EXISTS command_history (command, time, session_order)''')
 		connection.commit()
+	finally:
+		connection.close()
+
+def getCommand(index):
+	connection, cursor = begin()
+	try:
+		result = cursor.execute('SELECT command FROM command_history ORDER BY time DESC, session_order DESC LIMIT 1 OFFSET ?', (index,)).fetchone()
+		if result:
+			return result[0]
+		else:
+			return None
+	finally:
+		connection.close()
+
+def addCommand(command, time, order):
+	connection, cursor = begin()
+	try:
+		cursor.execute('INSERT INTO command_history VALUES (?, ?, ?)', (command, time, order))
+		if commandHistoryLimit <= countCommands():
+			deleteStart = cursor.execute('SELECT time FROM command_history ORDER BY time DESC, session_order DESC LIMIT 1 OFFSET ?', (commandHistoryLimit,)).fetchone()[0]
+			cursor.execute('DELETE FROM command_history WHERE time <= ?', (deleteStart,))
+		connection.commit()
+	finally:
+		connection.close()
+
+def countCommands():
+	connection, cursor = begin()
+	try:
+		return cursor.execute('SELECT COUNT(*) FROM command_history').fetchone()[0]
 	finally:
 		connection.close()
 

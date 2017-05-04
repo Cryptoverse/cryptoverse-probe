@@ -12,6 +12,7 @@ import matplotlib.pyplot as pyplot
 import requests
 
 autoRebuild = int(os.getenv('AUTO_REBUILD', '0')) == 1
+commandHistoryLimit = int(os.getenv('COMMAND_HISTORY', '100'))
 hostUrl = os.getenv('HOST_URL', 'http://localhost:5000')
 rulesUrl = hostUrl + '/rules'
 chainsUrl = hostUrl + '/chains'
@@ -693,15 +694,19 @@ def pollInput():
 	rightSequence = [ 27, 91, 67 ]
 	backSequence = [ 127 ]
 	controlCSequence = [ 3 ]
+	tabSequence = [ 9 ]
+	doubleEscapeSequence = [ 27, 27 ]
 
 	specialSequences = [
+		tabSequence,
 		returnSequence,
 		upSequence,
 		downSequence,
 		leftSequence,
 		rightSequence,
 		backSequence,
-		controlCSequence
+		controlCSequence,
+		doubleEscapeSequence
 	]
 	alphaNumericRange = range(32, 127)
 	isSpecial = True
@@ -714,6 +719,12 @@ def pollInput():
 		chars.append(char)
 		if len(chars) == 1 and char in alphaNumericRange:
 			break
+		elif 1 < len(chars):
+			lastChars = chars[-2:]
+			if lastChars == doubleEscapeSequence:
+				chars = lastChars
+				isSpecial = True
+				break
 	
 	alphaNumeric = ''
 	isReturn = False
@@ -723,6 +734,8 @@ def pollInput():
 	isDown = False
 	isLeft = False
 	isRight = False
+	isTab = False
+	isDoubleEscape = False
 
 	if isSpecial:
 		if chars == returnSequence:
@@ -739,6 +752,10 @@ def pollInput():
 			isLeft = True
 		elif chars == rightSequence:
 			isRight = True
+		elif chars == tabSequence:
+			isTab = True
+		elif chars == doubleEscapeSequence:
+			isDoubleEscape = True
 		else:
 			print 'Unrecognized special sequence %s' % chars
 	elif len(chars) == 1:
@@ -746,7 +763,7 @@ def pollInput():
 	else:
 		print 'Unrecognized alphanumeric sequence %s' % chars
 	
-	return alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight
+	return alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight, isTab, isDoubleEscape
 
 def main():
 	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart, shipReward)
@@ -870,6 +887,8 @@ def main():
 	commandPrefix = '> '
 	command = None
 	commandIndex = 0
+	commandHistory = -1
+	commandInSession = 0
 	while True:
 		
 		if command is None:
@@ -877,7 +896,7 @@ def main():
 			sys.stdout.write('\r%s%s\033[K' % (commandPrefix, command))
 			sys.stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
 
-		alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight = pollInput()
+		alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight, isTab, isDoubleEscape = pollInput()
 		oldCommandIndex = commandIndex
 		oldCommand = command
 		
@@ -893,17 +912,23 @@ def main():
 		elif isControlC:
 			break
 		elif isUp:
-			pass
+			commandHistory = min(commandHistory + 1, database.countCommands() - 1)
+			command = database.getCommand(commandHistory)
+			commandIndex = 0 if command is None else len(command)
 		elif isDown:
-			command = ''
-			commandIndex = 0
+			commandHistory = max(commandHistory - 1, -1)
+			if commandHistory < 0:
+				command = ''
+			else:
+				command = database.getCommand(commandHistory)
+			commandIndex = 0 if command is None else len(command)
 		elif isLeft:
 			if 0 < commandIndex:
 				commandIndex -= 1
 		elif isRight:
 			if commandIndex < len(command):
 				commandIndex += 1
-		else:
+		elif alphaNumeric:
 			if len(command) == commandIndex:
 				command += alphaNumeric
 			else:
@@ -915,9 +940,14 @@ def main():
 		if oldCommandIndex != commandIndex:
 			sys.stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
 
-		if isReturn:
+		if isReturn or isDoubleEscape:
 			sys.stdout.write('\n')
-		else:
+		if isDoubleEscape:
+			command = None
+			commandIndex = 0
+			commandHistory = -1
+			continue
+		if not isReturn:
 			continue
 
 		try:
@@ -943,8 +973,11 @@ def main():
 		except:
 			traceback.print_exc()
 			print 'Error with your last command'
+		database.addCommand(command, util.getTime(), commandInSession)
 		command = None
 		commandIndex = 0
+		commandHistory = -1
+		commandInSession += 1
 
 if __name__ == '__main__':
 	print 'Starting probe...'
@@ -965,6 +998,8 @@ if __name__ == '__main__':
 	os.environ['DIFFICULTY_DURATION'] = str(difficultyDuration)
 	os.environ['DIFFICULTY_START'] = str(difficultyStart)
 	os.environ['SHIP_REWARD'] = str(shipReward)
+
+	os.environ['COMMAND_HISTORY'] = str(commandHistoryLimit)
 
 	import util
 	import validate

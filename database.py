@@ -35,6 +35,8 @@ def getCommand(index):
 		connection.close()
 
 def addCommand(command, time, order):
+	if command is None or getCommand(0) == command:
+		return
 	connection, cursor = begin()
 	try:
 		cursor.execute('INSERT INTO command_history VALUES (?, ?, ?)', (command, time, order))

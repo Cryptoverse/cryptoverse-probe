@@ -144,7 +144,7 @@ def account(params=None):
 		result = database.getAccount()
 		if result:
 			print 'Using account "%s"' % result['name']
-			print '\tPublic Key:  %s...' % result['public_key'][:16]
+			print '\tFleet Hash: [%s]' % util.sha256(result['public_key'])[:6]
 		else:
 			print 'No active account'
 
@@ -153,10 +153,10 @@ def accountAll():
 	accounts = database.getAccounts()
 	if accounts:
 		message = 'Persistent data contains the following account entries'
-		entryMessage = '\n%s\t- %s\n\t\tPublic Key:  %s...'
+		entryMessage = '\n%s\t- %s\n\t\tFleet Hash: [%s]'
 		for currentAccount in accounts:
 			activeFlag = '[CURR] ' if currentAccount['active'] else ''
-			message += entryMessage % (activeFlag, currentAccount['name'], currentAccount['public_key'][:16])
+			message += entryMessage % (activeFlag, currentAccount['name'], util.sha256(currentAccount['public_key'])[:6])
 	print message
 
 def accountSet(name):

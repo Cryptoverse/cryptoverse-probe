@@ -8,10 +8,10 @@ def hasSingle(params):
 	return params and hasAny(params) and len(params) == 1
 
 def singleInt(params):
-	return int(params[0])
+	return int(params[0]) if hasAny(params) else None
 
 def singleStr(params):
-	return str(params[0])
+	return str(params[0]) if hasAny(params) else None
 
 def retrieve(params, keyword, foundValue, defaultValue):
 	if params:

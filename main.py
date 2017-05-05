@@ -434,19 +434,27 @@ def renderSystems(params=None):
 	pyplot.show()
 
 def listDeployments(params=None):
-	hashQuery = None
-	verbose = False
-	if putil.hasAny(params):
-		hashQuery = putil.singleStr(params)
-		verbose = putil.retrieve(params, '-v', True, False)
-	else:
-		print 'Specify a system hash to list the deployments in that system'
+	verbose = putil.retrieve(params, '-v', True, False)
+	listAll = not putil.hasAny(params) or putil.retrieve(params, '-a', True, False)
+	fromHash = None
+	if putil.retrieve(params, '-f', True, False):
+		fromHashQuery = putil.retrieveValue(params, '-f', None)
+		if fromHashQuery is None:
+			print 'A system hash fragment must be passed with the -f parameter'
+			return
+		fromHash = putil.naturalMatch(fromHashQuery, database.getStarLogHashes())
+		if fromHash is None:
+			print 'Unable to find a system hash containing %s' % fromHashQuery
+			return
+	if listAll:
+		listAllDeployments(fromHash, verbose)
 		return
+	hashQuery = putil.singleStr(params)
 	selectedHash = putil.naturalMatch(hashQuery, database.getStarLogHashes())
 	if selectedHash is None:
 		print 'Unable to find a system hash containing %s' % hashQuery
 		return
-	deployments = database.getUnusedEvents(systemHash=selectedHash)
+	deployments = database.getUnusedEvents(fromStarLog=fromHash, systemHash=selectedHash)
 	if verbose:
 		print prettyJson(deployments)
 		return
@@ -458,16 +466,54 @@ def listDeployments(params=None):
 			fleets[fleet] += count
 		else:
 			fleets[fleet] = count
-	result = 'No deployments in system %s' % selectedHash
+	result = 'No deployments in system [%s]' % selectedHash[:6]
 	if fleets:
-		result = 'Deployments in star system %s' % selectedHash
+		result = 'Deployments in star system [%s]' % selectedHash[:6]
 		fleetKeys = fleets.keys()
 		for i in range(0, len(fleets)):
-			currFleet = fleetKeys[i]
-			result += '\n - [%s] : %s' % (currFleet[:6], fleets[currFleet])
+			currentFleet = fleetKeys[i]
+			result += '\n - [%s] : %s' % (currentFleet[:6], fleets[currentFleet])
 		
 	print result
 
+def listAllDeployments(fromStarLog, verbose):
+	deployments = database.getUnusedEvents(fromStarLog=fromStarLog)
+	if verbose:
+		print prettyJson(deployments)
+		return
+	systems = {}
+	for deployment in deployments:
+		system = deployment['star_system']
+		fleet = deployment['fleet_hash']
+		count = deployment['count']
+		currentSystem = None
+		if system in systems:
+			currentSystem = systems[system]
+		else:
+			currentSystem = {}
+			systems[system] = currentSystem
+		
+		if fleet in currentSystem:
+			currentSystem[fleet] += count
+		else:
+			currentSystem[fleet] = count
+	result = 'No deployments in any systems'
+	accountHash = util.sha256(database.getAccount()['public_key'])
+	if systems:
+		result = 'Deployments in all systems'
+		systemKeys = systems.keys()
+		for i in range(0, len(systemKeys)):
+			currentSystem = systemKeys[i]
+			result += '\n - [%s]' % currentSystem[:6]
+			fleetKeys = systems[currentSystem].keys()
+			for f in range(0, len(fleetKeys)):
+				currentFleet = fleetKeys[f]
+				fleetCount = systems[currentSystem][currentFleet]
+				activeFlag = '[CURR] ' if currentFleet == accountHash else ''
+				result += '\n%s\t - [%s] : %s' % (activeFlag, currentFleet[:6], fleetCount)
+		
+	print result
+	
 def jump(params=None):
 	originFragment = None
 	destinationFragment = None
@@ -830,7 +876,9 @@ def main():
 			listDeployments,
 			'List deployments in the specified system',
 			[
-				'Passing a partial hash will list deployments in the best matching system'	
+				'Passing a partial hash will list deployments in the best matching system',
+				'"-a" lists all systems with deployments'
+				'"-f" looks for deployments on the chain with the matching head'
 			]
 		),
 		'jump': createCommand(

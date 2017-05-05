@@ -181,7 +181,7 @@ def getStarLogHighest(systemHash=None):
 					checked.append(currentParent['hash'])
 					if currentParent['height'] <= targetSystem['height']:
 						break
-					previousHash = currentParent['hash']
+					previousHash = currentParent['previous_hash']
 				if previousHash == systemHash:
 					highestChild = json.loads(entry[3])
 					break
@@ -284,6 +284,8 @@ def getUnusedEvents(fromStarLog=None, systemHash=None, fleetHash=None):
 							continue
 					if fleetHash is not None and eventOutput['fleet_hash'] != fleetHash:
 						continue
+					if eventOutput['star_system'] is None:
+						eventOutput['star_system'] = system['hash']
 					results.append(eventOutput)
 		fromStarLog = system['previous_hash']
 	return results

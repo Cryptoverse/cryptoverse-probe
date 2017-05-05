@@ -8,6 +8,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from getch import getch
+from mpl_toolkits.mplot3d import Axes3D # pylint: disable=unused-import
 import matplotlib.pyplot as pyplot
 import requests
 
@@ -18,6 +19,11 @@ rulesUrl = hostUrl + '/rules'
 chainsUrl = hostUrl + '/chains'
 starLogsUrl = hostUrl + '/star-logs'
 eventsUrl = hostUrl + '/events'
+
+defaultColor = '\033[0m'
+successColor = '\033[92m'
+errorColor = '\033[91m'
+boldColor = '\033[1m'
 
 difficultyFudge = None
 difficultyInterval = None
@@ -198,11 +204,12 @@ def probe(params=None):
 	if not post:
 		return
 	try:
-		postResult = postRequest(starLogsUrl, generated)
-		if postResult == 200:
+		result = postRequest(starLogsUrl, generated)
+		if result == 200:
 			database.addStarLog(generated)
 		if not silent:
-			print 'Posted starlog with response %s' % postResult
+			prefix, postfix = successColor if result == 200 else errorColor, defaultColor
+			print 'Posted starlog with response %s%s%s' % (prefix, result, postfix)
 	except:
 		traceback.print_exc()
 		print 'Something went wrong when trying to post the generated starlog'
@@ -583,7 +590,8 @@ def jump(params=None):
 		renderJump(originHash, destinationHash)
 	if not abort:
 		result = postRequest(eventsUrl, jumpEvent)
-		print 'Posted jump event with response %s' % result
+		prefix, postfix = successColor if result == 200 else errorColor, defaultColor
+		print 'Posted jump event with response %s%s%s' % (prefix, result, postfix)
 
 def renderJump(originHash, destinationHash):
 	higher = database.getStarLogHighestFromList([originHash, destinationHash])
@@ -969,7 +977,7 @@ def main():
 			commandIndex += 1
 
 		if oldCommand != command:
-			sys.stdout.write('\r%s%s\033[K' % (commandPrefix, command))
+			sys.stdout.write('\r%s%s%s%s\033[K' % (commandPrefix, boldColor, command, defaultColor))
 		if oldCommandIndex != commandIndex:
 			sys.stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
 

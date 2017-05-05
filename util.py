@@ -171,7 +171,7 @@ def concatStarLogHeader(starLog):
 	Returns:
 		str: Resulting header.
 	'''
-	return '%s%s%s%s%s%s' % (starLog['version'], starLog['previous_hash'], starLog['difficulty'], starLog['nonce'], starLog['time'], starLog['events_hash'])
+	return '%s%s%s%s%s%s' % (starLog['version'], starLog['previous_hash'], starLog['difficulty'], starLog['events_hash'], starLog['time'], starLog['nonce'])
 
 def concatEvent(eventJson):
 	'''Concats the information of an event from the provided json.

@@ -275,7 +275,7 @@ def getUnusedEvents(fromStarLog=None, systemHash=None, fleetHash=None):
 			if event['type'] not in util.shipEventTypes:
 				continue
 			for eventInput in event['inputs']:
-				usedEvents.append(eventInput)
+				usedEvents.append(eventInput['key'])
 			for eventOutput in event['outputs']:
 				if eventOutput['type'] in util.shipEventTypes and eventOutput['key'] not in usedEvents:
 					if systemHash is not None:

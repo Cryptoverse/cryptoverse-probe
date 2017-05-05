@@ -222,6 +222,9 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	if not isGenesis:
 		eventResults = getRequest(eventsUrl, {'limit': eventsMaxLimit})
 		if eventResults:
+			unusedEvents = []
+			for unusedEvent in database.getUnusedEvents(fromStarLog=nextStarLog['hash']):
+				unusedEvents.append(unusedEvent['key'])
 			usedInputs = []
 			usedOutputs = []
 			events = []
@@ -230,7 +233,7 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 				conflict = False
 				currentUsedInputs = []
 				for currentInput in event['inputs']:
-					conflict = currentInput['key'] in usedInputs + currentUsedInputs
+					conflict = currentInput['key'] in usedInputs + currentUsedInputs or currentInput['key'] not in unusedEvents
 					if conflict:
 						break
 					currentUsedInputs.append(currentInput['key'])
@@ -525,9 +528,10 @@ def jump(params=None):
 	if not database.getStarLogsShareChain([originHash, destinationHash]):
 		print 'Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6])
 		return
+	highestHash = database.getStarLogHighest(database.getStarLogHighestFromList([originHash, destinationHash]))['hash']
 	accountInfo = database.getAccount()
 	fleetHash = util.sha256(accountInfo['public_key'])
-	deployments = database.getUnusedEvents(systemHash=originHash, fleetHash=fleetHash)
+	deployments = database.getUnusedEvents(fromStarLog=highestHash, systemHash=originHash, fleetHash=fleetHash)
 	totalShips = 0
 	for deployment in deployments:
 		totalShips += deployment['count']
@@ -858,7 +862,7 @@ def main():
 			'List deployments in the specified system',
 			[
 				'Passing a partial hash will list deployments in the best matching system',
-				'"-a" lists all systems with deployments'
+				'"-a" lists all systems with deployments',
 				'"-f" looks for deployments on the chain with the matching head'
 			]
 		),

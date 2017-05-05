@@ -9,13 +9,21 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
-difficultyFudge = int(os.getenv('DIFFICULTY_FUDGE', '0'))
-difficultyInterval = int(os.getenv('DIFFICULTY_INTERVAL', '7560'))
-difficultyDuration = int(os.getenv('DIFFICULTY_DURATION', '1209600'))
-difficultyStart = int(os.getenv('DIFFICULTY_START', '486604799'))
-shipReward = int(os.getenv('SHIP_REWARD', '10'))
-maximumStarLogSize = int(os.getenv('STARLOGS_MAX_BYTES', '999999'))
-maximumEventSize = int(os.getenv('EVENTS_MAX_BYTES', '999999'))
+def difficultyFudge():
+	return int(os.getenv('DIFFICULTY_FUDGE', '0'))
+def difficultyInterval():
+	return int(os.getenv('DIFFICULTY_INTERVAL', '7560'))
+def difficultyDuration():
+	return int(os.getenv('DIFFICULTY_DURATION', '1209600'))
+def difficultyStart():
+	return int(os.getenv('DIFFICULTY_START', '486604799'))
+def shipReward():
+	return int(os.getenv('SHIP_REWARD', '10'))
+def maximumStarLogSize():
+	return int(os.getenv('STARLOGS_MAX_BYTES', '999999'))
+def maximumEventSize():
+	return int(os.getenv('EVENTS_MAX_BYTES', '999999'))
+
 maximumTarget = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
 emptyTarget = '0000000000000000000000000000000000000000000000000000000000000000'
 
@@ -32,11 +40,11 @@ shipEventTypes = [
 	'attack'
 ]
 
-if not 0 <= difficultyFudge <= 8:
+if not 0 <= difficultyFudge() <= 8:
 	raise ValueError('DIFFICULTY_FUDGE must be a value from 0 to 8 (inclusive)')
-elif 0 < difficultyFudge:
-	prefix = maximumTarget[difficultyFudge:]
-	suffix = maximumTarget[:difficultyFudge]
+elif 0 < difficultyFudge():
+	prefix = maximumTarget[difficultyFudge():]
+	suffix = maximumTarget[:difficultyFudge()]
 	maximumTarget = prefix + suffix
 
 def isGenesisStarLog(sha):
@@ -127,7 +135,7 @@ def isDifficultyChanging(height):
 	Returns:
 		bool: True if a difficulty recalculation should take place.
 	'''
-	return (height % difficultyInterval) == 0
+	return (height % difficultyInterval()) == 0
 
 def calculateDifficulty(difficulty, duration):
 	'''Takes the packed integer difficulty and the duration of the last interval to calculate the new difficulty.
@@ -139,15 +147,15 @@ def calculateDifficulty(difficulty, duration):
 	Returns:
 		int: Packed int format of the next difficulty.
 	'''
-	if duration < difficultyDuration / 4:
-		duration = difficultyDuration / 4
-	elif duration > difficultyDuration * 4:
-		duration = difficultyDuration * 4
+	if duration < difficultyDuration() / 4:
+		duration = difficultyDuration() / 4
+	elif duration > difficultyDuration() * 4:
+		duration = difficultyDuration() * 4
 
 	limit = long(maximumTarget, 16)
 	result = long(unpackBits(difficulty), 16)
 	result *= duration
-	result /= difficultyDuration
+	result /= difficultyDuration()
 
 	if limit < result:
 		result = limit
@@ -293,8 +301,8 @@ def unpackBits(difficulty):
 	for i in range(0, trailingPadding):
 		base256 += '00'
 	
-	if 0 < difficultyFudge:
-		base256 = base256[difficultyFudge:] + base256[:difficultyFudge]
+	if 0 < difficultyFudge():
+		base256 = base256[difficultyFudge():] + base256[:difficultyFudge()]
 	return base256
 
 def getFleets(eventsJson):

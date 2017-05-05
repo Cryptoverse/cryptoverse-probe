@@ -1,7 +1,7 @@
-import sys
-import traceback
-import os
-import json
+from json import dumps as jsonDump
+from os import getenv, environ
+from sys import stdout, maxint
+from traceback import print_exc as printException
 from datetime import datetime
 from ete3 import Tree
 from cryptography.hazmat.backends import default_backend
@@ -9,12 +9,18 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from getch import getch
 from mpl_toolkits.mplot3d import Axes3D # pylint: disable=unused-import
+from commandException import CommandException
 import matplotlib.pyplot as pyplot
 import requests
+import database
+import util
+import validate
+import parameterUtil as putil
 
-autoRebuild = int(os.getenv('AUTO_REBUILD', '0')) == 1
-commandHistoryLimit = int(os.getenv('COMMAND_HISTORY', '100'))
-hostUrl = os.getenv('HOST_URL', 'http://localhost:5000')
+autoRebuild = int(getenv('AUTO_REBUILD', '0')) == 1
+
+# commandHistoryLimit = int(getenv('COMMAND_HISTORY', '100'))
+hostUrl = getenv('HOST_URL', 'http://localhost:5000')
 rulesUrl = hostUrl + '/rules'
 chainsUrl = hostUrl + '/chains'
 starLogsUrl = hostUrl + '/star-logs'
@@ -25,21 +31,12 @@ successColor = '\033[92m'
 errorColor = '\033[91m'
 boldColor = '\033[1m'
 
-difficultyFudge = None
-difficultyInterval = None
-difficultyDuration = None
-difficultyStart = None
-shipReward = None
-starLogsMaxLimit = None
-eventsMaxLimit = None
-chainsMaxLimit = None
-
 def getGenesis():
 	return {
 		'nonce': 0,
 		'height': 0,
 		'hash': util.emptyTarget,
-		'difficulty': difficultyStart,
+		'difficulty': util.difficultyStart(),
 		'events': [],
 		'version': 0,
 		'time': 0,
@@ -90,21 +87,21 @@ def generateAccount(name='default'):
 	}
 
 def prettyJson(serialized):
-	return json.dumps(serialized, sort_keys=True, indent=4, separators=(',', ': '))
+	return jsonDump(serialized, sort_keys=True, indent=4, separators=(',', ': '))
 
 def getRequest(url, payload=None):
 	try:
 		return requests.get(url, payload).json()
 	except:
-		traceback.print_exc()
+		printException()
 		print 'error on get request '+url
 
 def postRequest(url, payload=None):
 	try:
-		serialized = json.dumps(payload)
+		serialized = jsonDump(payload)
 		return requests.post(url, data=serialized, headers={ 'content-type': 'application/json', 'cache-control': 'no-cache', }).json()
 	except:
-		traceback.print_exc()
+		printException()
 		print 'error on post request '+url
 
 def createCommand(function, description, details=None):
@@ -134,8 +131,7 @@ def commandHelp(commands, params=None):
 			elif queriedCommandName == 'exit':
 				print exitMessage % ''
 				return
-			print 'Command "%s" is not recognized, try typing "help" for a list of all commands' % queriedCommandName
-			return
+			raise CommandException('Command "%s" is not recognized, try typing "help" for a list of all commands' % queriedCommandName)
 
 	print helpMessage % 'help\t - '
 	for curr in commands:
@@ -170,13 +166,12 @@ def accountSet(name):
 	if not name:
 		print 'Account cannot be set to None'
 	if not database.anyAccount(name):
-		print 'Unable to find account %s' % name
-		return
+		raise CommandException('Unable to find account %s' % name)
 	database.setAccountActive(name)
 	print 'Current account is now "%s"' % name
 
 def info():
-	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration) 
+	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, util.difficultyFudge(), util.difficultyInterval(), util.difficultyDuration()) 
 
 def starLog(params=None):
 	targetHash = None
@@ -193,10 +188,13 @@ def probe(params=None):
 	verbose = putil.retrieve(params, '-v', True, False)
 	silent = putil.retrieve(params, '-s', True, False)
 	allowDuplicateEvents = putil.retrieve(params, '-d', True, False)
-	fromStarLog = putil.retrieveValue(params, '-f', None)
-	if fromStarLog is not None:
-		fromStarLog = putil.naturalMatch(fromStarLog, database.getStarLogHashes())
-	generated = generateNextStarLog(fromStarLog, fromGenesis, allowDuplicateEvents)
+	fromQuery = putil.retrieveValue(params, '-f', None)
+	fromHash = None
+	if fromQuery is not None:
+		fromHash = putil.naturalMatch(fromQuery, database.getStarLogHashes())
+		if fromHash is None:
+			raise CommandException('Unable to find a system hash containing %s' % fromQuery)
+	generated = generateNextStarLog(fromHash, fromGenesis, allowDuplicateEvents)
 	if not silent:
 		print 'Probed new starlog %s' % generated['hash'][:6]
 		if verbose:
@@ -211,7 +209,7 @@ def probe(params=None):
 			prefix, postfix = successColor if result == 200 else errorColor, defaultColor
 			print 'Posted starlog with response %s%s%s' % (prefix, result, postfix)
 	except:
-		traceback.print_exc()
+		printException()
 		print 'Something went wrong when trying to post the generated starlog'
 
 def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvents=False):
@@ -227,7 +225,7 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	nextStarLog['events'] = []
 
 	if not isGenesis:
-		eventResults = getRequest(eventsUrl, {'limit': eventsMaxLimit})
+		eventResults = getRequest(eventsUrl, {'limit': util.maximumEventSize()})
 		if eventResults:
 			unusedEvents = []
 			for unusedEvent in database.getUnusedEvents(fromStarLog=nextStarLog['hash']):
@@ -272,7 +270,7 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 		'fleet_hash': util.sha256(accountInfo['public_key']),
 		'key': util.sha256('%s%s' % (util.getTime(), accountInfo['public_key'])),
 		'star_system': None,
-		'count': util.shipReward,
+		'count': util.shipReward(),
 	}
 
 	rewardEvent = {
@@ -310,7 +308,7 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	started = datetime.now()
 	lastCheckin = started
 
-	while not found and tries < sys.maxint:
+	while not found and tries < maxint:
 		nextStarLog['nonce'] += 1
 		nextStarLog = util.hashStarLog(nextStarLog)
 		found = False
@@ -329,8 +327,7 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 		tries += 1
 	
 	if not found:
-		print 'Unable to probe a new starlog'
-		return None
+		raise CommandException('Unable to probe a new starlog')
 	return nextStarLog
 
 def sync(params=None):
@@ -338,10 +335,10 @@ def sync(params=None):
 	latest = database.getStarLogLatest()
 	latestTime = 0 if latest is None else latest['time']
 	allResults = []
-	lastCount = starLogsMaxLimit
+	lastCount = util.maximumStarLogSize()
 	offset = 0
-	while starLogsMaxLimit == lastCount:
-		results = getRequest(starLogsUrl, { 'since_time': latestTime, 'limit': starLogsMaxLimit, 'offset': offset })
+	while util.maximumStarLogSize() == lastCount:
+		results = getRequest(starLogsUrl, { 'since_time': latestTime, 'limit': util.maximumStarLogSize(), 'offset': offset })
 		lastCount = len(results)
 		offset += lastCount
 		allResults += results
@@ -361,13 +358,11 @@ def renderChain(params=None):
 		if putil.hasSingle(params):
 			limit = putil.singleInt(params)
 		else:
-			print 'unsupported parameters'
-			return
+			raise CommandException('Unsupported parameters')
 
 	highest = database.getStarLogHighest()
 	if highest is None:
-		print 'No starlogs to render, try "sync"'
-		return
+		raise CommandException('No starlogs to render, try "sync"')
 	height = highest['height'] if height is None else height
 	results = database.getStarLogsAtHight(height, limit)
 	strata = [(height, list(results))]
@@ -431,20 +426,17 @@ def listDeployments(params=None):
 	if putil.retrieve(params, '-f', True, False):
 		fromHashQuery = putil.retrieveValue(params, '-f', None)
 		if fromHashQuery is None:
-			print 'A system hash fragment must be passed with the -f parameter'
-			return
+			raise CommandException('A system hash fragment must be passed with the -f parameter')
 		fromHash = putil.naturalMatch(fromHashQuery, database.getStarLogHashes())
 		if fromHash is None:
-			print 'Unable to find a system hash containing %s' % fromHashQuery
-			return
+			raise CommandException('Unable to find a system hash containing %s' % fromHashQuery)
 	if listAll:
 		listAllDeployments(fromHash, verbose)
 		return
 	hashQuery = putil.singleStr(params)
 	selectedHash = putil.naturalMatch(hashQuery, database.getStarLogHashes())
 	if selectedHash is None:
-		print 'Unable to find a system hash containing %s' % hashQuery
-		return
+		raise CommandException('Unable to find a system hash containing %s' % hashQuery)
 	deployments = database.getUnusedEvents(fromStarLog=fromHash, systemHash=selectedHash)
 	if verbose:
 		print prettyJson(deployments)
@@ -514,27 +506,22 @@ def jump(params=None):
 	count = None
 	if putil.hasAny(params):
 		if len(params) < 2:
-			print 'An origin and destination system must be specified'
-			return
+			raise CommandException('An origin and destination system must be specified')
 		originFragment = params[0]
 		destinationFragment = params[1]
 		if 2 < len(params) and isinstance(params[2], int):
 			count = int(params[2])
 	else:
-		print 'Specify an origin and destination system'
-		return
+		raise CommandException('Specify an origin and destination system')
 	hashes = database.getStarLogHashes()
 	originHash = putil.naturalMatch(originFragment, hashes)
 	if originHash is None:
-		print 'Unable to find an origin system containing %s' % originFragment
-		return
+		raise CommandException('Unable to find an origin system containing %s' % originFragment)
 	destinationHash = putil.naturalMatch(destinationFragment, hashes)
 	if destinationHash is None:
-		print 'Unable to find a destination system containing %s' % destinationFragment
-		return
+		raise CommandException('Unable to find a destination system containing %s' % destinationFragment)
 	if not database.getStarLogsShareChain([originHash, destinationHash]):
-		print 'Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6])
-		return
+		raise CommandException('Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6]))
 	highestHash = database.getStarLogHighest(database.getStarLogHighestFromList([originHash, destinationHash]))['hash']
 	accountInfo = database.getAccount()
 	fleetHash = util.sha256(accountInfo['public_key'])
@@ -545,11 +532,9 @@ def jump(params=None):
 	if count is None:
 		count = totalShips
 	elif totalShips < count:
-		print 'Not enough ships to jump from the origin system'
-		return
+		raise CommandException('Not enough ships to jump from the origin system')
 	if count <= 0:
-		print 'A number of ships greater than zero must be specified for a jump'
-		return
+		raise CommandException('A number of ships greater than zero must be specified for a jump')
 
 	jumpEvent = {
 		'fleet_hash': fleetHash,
@@ -623,33 +608,27 @@ def renderJump(originHash, destinationHash):
 
 def systemPosition(params=None):
 	if not putil.hasSingle(params):
-		print 'An origin system must be specified'
-		return
+		raise CommandException('An origin system must be specified')
 	originFragment = putil.singleStr(params)
 	originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
 	if originHash is None:
-		print 'Unable to find an origin system containing %s' % originFragment
-		return
+		raise CommandException('Unable to find an origin system containing %s' % originFragment)
 	print '[%s] system is at %s' % (originHash[:6], util.getCartesian(originHash))
 
 def systemDistance(params=None):
 	if not putil.hasCount(params, 2):
-		print 'An origin and destination system must be specified'
-		return
+		raise CommandException('An origin and destination system must be specified')
 	originFragment = params[0]
 	destinationFragment = params[1]
 	hashes = database.getStarLogHashes()
 	originHash = putil.naturalMatch(originFragment, hashes)
 	if originHash is None:
-		print 'Unable to find an origin system containing %s' % originFragment
-		return
+		raise CommandException('Unable to find an origin system containing %s' % originFragment)
 	destinationHash = putil.naturalMatch(destinationFragment, hashes)
 	if destinationHash is None:
-		print 'Unable to find a destination system containing %s' % destinationFragment
-		return
+		raise CommandException('Unable to find a destination system containing %s' % destinationFragment)
 	if not database.getStarLogsShareChain([originHash, destinationHash]):
-		print 'Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6])
-		return
+		raise CommandException('Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6]))
 	print 'Distance between [%s] and [%s] is %s' % (originHash[:6], destinationHash[:6], util.getDistance(originHash, destinationHash))
 
 def systemAverageDistances(params=None):
@@ -658,8 +637,7 @@ def systemAverageDistances(params=None):
 		originFragment = params[0]
 		originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
 		if originHash is None:
-			print 'Unable to find an origin system containing %s' % originFragment
-			return
+			raise CommandException('Unable to find an origin system containing %s' % originFragment)
 	total = 0
 	count = 0
 	if originHash:
@@ -697,8 +675,7 @@ def systemMinMaxDistance(params=None, calculatingMax=True):
 		originFragment = params[0]
 		originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
 		if originHash is None:
-			print 'Unable to find an origin system containing %s' % originFragment
-			return
+			raise CommandException('Unable to find an origin system containing %s' % originFragment)
 	if originHash:
 		bestSystem = None
 		bestDistance = 0 if calculatingMax else 999999999
@@ -805,7 +782,22 @@ def pollInput():
 	return alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight, isTab, isDoubleEscape
 
 def main():
-	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, difficultyFudge, difficultyInterval, difficultyDuration, difficultyStart, shipReward)
+	print 'Starting probe...'
+	rules = getRequest(rulesUrl)
+	if not rules:
+		raise ValueError('null rules')
+	
+	environ['DIFFICULTY_FUDGE'] = str(rules['difficulty_fudge'])
+	environ['DIFFICULTY_INTERVAL'] = str(rules['difficulty_interval'])
+	environ['DIFFICULTY_DURATION'] = str(rules['difficulty_duration'])
+	environ['DIFFICULTY_START'] = str(rules['difficulty_start'])
+	environ['SHIP_REWARD'] = str(rules['ship_reward'])
+	environ['STARLOGS_MAX_BYTES'] = str(rules['star_logs_max_limit'])
+	environ['EVENTS_MAX_BYTES'] = str(rules['events_max_limit'])
+
+	environ['COMMAND_HISTORY'] = getenv('COMMAND_HISTORY', '100')
+
+	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, util.difficultyFudge(), util.difficultyInterval(), util.difficultyDuration(), util.difficultyStart(), util.shipReward())
 	
 	if autoRebuild:
 		print 'Automatically rebuilding database...'
@@ -934,8 +926,8 @@ def main():
 		
 		if command is None:
 			command = ''
-			sys.stdout.write('\r%s%s\033[K' % (commandPrefix, command))
-			sys.stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
+			stdout.write('\r%s%s\033[K' % (commandPrefix, command))
+			stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
 
 		alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight, isTab, isDoubleEscape = pollInput()
 		oldCommandIndex = commandIndex
@@ -977,12 +969,12 @@ def main():
 			commandIndex += 1
 
 		if oldCommand != command:
-			sys.stdout.write('\r%s%s%s%s\033[K' % (commandPrefix, boldColor, command, defaultColor))
+			stdout.write('\r%s%s%s%s\033[K' % (commandPrefix, boldColor, command, defaultColor))
 		if oldCommandIndex != commandIndex:
-			sys.stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
+			stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
 
 		if isReturn or isDoubleEscape:
-			sys.stdout.write('\n')
+			stdout.write('\n')
 		if isDoubleEscape:
 			command = None
 			commandIndex = 0
@@ -1011,8 +1003,10 @@ def main():
 					selectedCommand['function']()
 				else:
 					selectedCommand['function'](commandArgs)
+		except CommandException as exception:
+			print exception
 		except:
-			traceback.print_exc()
+			printException()
 			print 'Error with your last command'
 		database.addCommand(command, util.getTime(), commandInSession)
 		command = None
@@ -1021,30 +1015,5 @@ def main():
 		commandInSession += 1
 
 if __name__ == '__main__':
-	print 'Starting probe...'
-	rules = getRequest(rulesUrl)
-	if not rules:
-		raise ValueError('null rules')
-	difficultyFudge = rules['difficulty_fudge']
-	difficultyInterval = rules['difficulty_interval']
-	difficultyDuration = rules['difficulty_duration']
-	difficultyStart = rules['difficulty_start']
-	shipReward = rules['ship_reward']
-	starLogsMaxLimit = rules['star_logs_max_limit']
-	eventsMaxLimit = rules['events_max_limit']
-	chainsMaxLimit = rules['chains_max_limit']
-
-	os.environ['DIFFICULTY_FUDGE'] = str(difficultyFudge)
-	os.environ['DIFFICULTY_INTERVAL'] = str(difficultyInterval)
-	os.environ['DIFFICULTY_DURATION'] = str(difficultyDuration)
-	os.environ['DIFFICULTY_START'] = str(difficultyStart)
-	os.environ['SHIP_REWARD'] = str(shipReward)
-
-	os.environ['COMMAND_HISTORY'] = str(commandHistoryLimit)
-
-	import util
-	import validate
-	import database
-	import parameterUtil as putil
 	main()
-	sys.stdout.write('\nExiting...\n')
+	stdout.write('\nExiting...\n')

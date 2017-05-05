@@ -4,7 +4,9 @@ import json
 import util
 
 databaseFileName = 'local.db'
-commandHistoryLimit = int(os.getenv('COMMAND_HISTORY', '100'))
+
+def commandHistoryLimit():
+	return int(os.getenv('COMMAND_HISTORY', '100'))
 
 def begin():
 	connection = sqlite3.connect(databaseFileName)
@@ -40,8 +42,8 @@ def addCommand(command, time, order):
 	connection, cursor = begin()
 	try:
 		cursor.execute('INSERT INTO command_history VALUES (?, ?, ?)', (command, time, order))
-		if commandHistoryLimit <= countCommands():
-			deleteStart = cursor.execute('SELECT time FROM command_history ORDER BY time DESC, session_order DESC LIMIT 1 OFFSET ?', (commandHistoryLimit,)).fetchone()[0]
+		if commandHistoryLimit() <= countCommands():
+			deleteStart = cursor.execute('SELECT time FROM command_history ORDER BY time DESC, session_order DESC LIMIT 1 OFFSET ?', (commandHistoryLimit(),)).fetchone()[0]
 			cursor.execute('DELETE FROM command_history WHERE time <= ?', (deleteStart,))
 		connection.commit()
 	finally:

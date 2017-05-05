@@ -1,6 +1,5 @@
 import re
 import binascii
-import traceback
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -93,7 +92,7 @@ def events(eventsJson):
 	Args:
 		stateJson (dict): State json.
 	'''
-	remainingShipRewards = util.shipReward
+	remainingShipRewards = util.shipReward()
 	inputKeys = []
 	outputKeys = []
 	for currentEvent in eventsJson:

@@ -182,22 +182,15 @@ def starLog(params=None):
 
 def probe(params=None):
 	# TODO: Sync first...
-	height = None
-	post = True
-	verbose = False
-	silent = False
-	allowDuplicateEvents = False
-	fromStarLog = None
-	if params:
-		height = putil.retrieve(params, '-g', -1, height)
-		post = putil.retrieve(params, '-a', False, post)
-		verbose = putil.retrieve(params, '-v', True, verbose)
-		silent = putil.retrieve(params, '-s', True, silent)
-		allowDuplicateEvents = putil.retrieve(params, '-d', True, allowDuplicateEvents)
-		fromStarLog = putil.retrieveValue(params, '-f', fromStarLog)
+	fromGenesis = putil.retrieve(params, '-g', True, False)
+	post = putil.retrieve(params, '-a', False, True)
+	verbose = putil.retrieve(params, '-v', True, False)
+	silent = putil.retrieve(params, '-s', True, False)
+	allowDuplicateEvents = putil.retrieve(params, '-d', True, False)
+	fromStarLog = putil.retrieveValue(params, '-f', None)
 	if fromStarLog is not None:
 		fromStarLog = putil.naturalMatch(fromStarLog, database.getStarLogHashes())
-	generated = generateNextStarLog(fromStarLog, height, allowDuplicateEvents)
+	generated = generateNextStarLog(fromStarLog, fromGenesis, allowDuplicateEvents)
 	if not silent:
 		print 'Probed new starlog %s' % generated['hash'][:6]
 		if verbose:
@@ -214,26 +207,14 @@ def probe(params=None):
 		traceback.print_exc()
 		print 'Something went wrong when trying to post the generated starlog'
 
-def generateNextStarLog(fromStarLog=None, height=None, allowDuplicateEvents=False):
+def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvents=False):
 	nextStarLog = getGenesis()
 	if fromStarLog:
 		nextStarLog = database.getStarLog(fromStarLog)
-	elif height:
-		if height < -1:
-			raise ValueError('Paremeter "height" is out of range')
-		if height != -1:
-			# TODO: Change this to get from the local database
-			result = getRequest(chainsUrl, {'height': height})
-			if result:
-				nextStarLog = result[0]
-			else:
-				raise ValueError('No starlog at specified height could be retrieved')
-	else:
-		# TODO: Change this to get from the local database
-		result = getRequest(chainsUrl, {'height': height})
-		if result:
-			nextStarLog = result[0]
-			height = nextStarLog['height']
+	elif not fromGenesis:
+		localHighest = database.getStarLogHighest()
+		if localHighest is not None:
+			nextStarLog = localHighest
 	isGenesis = util.isGenesisStarLog(nextStarLog['hash'])
 	accountInfo = database.getAccount()
 	nextStarLog['events'] = []
@@ -313,7 +294,7 @@ def generateNextStarLog(fromStarLog=None, height=None, allowDuplicateEvents=Fals
 	nextStarLog['nonce'] = 0
 	nextStarLog['events_hash'] = util.hashEvents(nextStarLog['events'])
 	nextStarLog['log_header'] = util.concatStarLogHeader(nextStarLog)
-	nextStarLog['height'] = 0 if height is None else height + 1
+	nextStarLog['height'] = 0 if isGenesis else nextStarLog['height'] + 1
 	found = False
 	tries = 0
 	started = datetime.now()

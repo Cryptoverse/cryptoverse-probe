@@ -263,7 +263,7 @@ def hashEvent(event):
 	'''
 	return sha256(concatEvent(event))
 
-def unpackBits(difficulty):
+def unpackBits(difficulty, strip=False):
 	'''Unpacks int difficulty into a target hex.
 
 	Args:
@@ -303,7 +303,7 @@ def unpackBits(difficulty):
 	
 	if 0 < difficultyFudge():
 		base256 = base256[difficultyFudge():] + base256[:difficultyFudge()]
-	return base256
+	return base256.rstrip('0') if strip else base256
 
 def getFleets(eventsJson):
 	'''Gets all fleets with their keys.

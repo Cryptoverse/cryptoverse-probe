@@ -305,28 +305,38 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	nextStarLog['height'] = 0 if isGenesis else nextStarLog['height'] + 1
 	found = False
 	tries = 0
+	checkInterval = 1000000
+	nextCheck = checkInterval
 	started = datetime.now()
 	lastCheckin = started
+	nextStarLog = util.hashStarLog(nextStarLog)
+	currentDifficulty = util.unpackBits(nextStarLog['difficulty'], True)
+	currentDifficultyLeadingZeros = len(currentDifficulty) - len(currentDifficulty.lstrip('0'))
+	currentNonce = nextStarLog['nonce']
+	logPrefix = nextStarLog['log_header'][:-len(str(currentNonce))]
+	currentHash = None
 
 	while not found and tries < maxint:
-		nextStarLog['nonce'] += 1
-		nextStarLog = util.hashStarLog(nextStarLog)
-		found = False
+		currentNonce += 1
+		currentHash = util.sha256('%s%s' % (logPrefix, currentNonce))
 		try:
-			validate.difficulty(int(nextStarLog['difficulty']), nextStarLog['hash'])
+			validate.difficultyUnpacked(currentDifficulty, currentDifficultyLeadingZeros, currentHash, False)
 			found = True
 		except:
 			pass
-		now = datetime.now()
-		if 1 < (now - lastCheckin).total_seconds():
-			lastCheckin = now
-			elapsedSeconds = (now - started).total_seconds()
+		if tries == nextCheck:
+			nextCheck = tries + checkInterval
+			lastCheckin = datetime.now()
+			elapsedSeconds = (lastCheckin - started).total_seconds()
 			hashesPerSecond = tries / elapsedSeconds
 			elapsedMinutes = elapsedSeconds / 60
 			print 'Probing at %.0f hashes per second, %.1f minutes elapsed...' % (hashesPerSecond, elapsedMinutes)
 		tries += 1
-	
-	if not found:
+	if found:
+		nextStarLog['nonce'] = currentNonce
+		nextStarLog['log_header'] = '%s%s' % (logPrefix, currentNonce)
+		nextStarLog['hash'] = currentHash
+	else:
 		raise CommandException('Unable to probe a new starlog')
 	return nextStarLog
 

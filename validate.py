@@ -232,22 +232,38 @@ def eventRsa(eventJson):
 	except InvalidSignature:
 		raise Exception('Invalid RSA signature')
 
-def difficulty(packed, sha):
+def difficulty(packed, sha, validateParams=True):
 	'''Takes the integer form of difficulty and verifies that the hash is less than it.
 
 	Args:
 		packed (int): Packed target difficulty the provided Sha256 hash must meet.
 		sha (str): Hex target to test, stripped of its leading 0x.
 	'''
-	if not isinstance(packed, (int, long)):
-		raise Exception('difficulty is not an int')
+	if validateParams:
+		if not isinstance(packed, (int, long)):
+			raise Exception('difficulty is not an int')
+		fieldIsSha256(sha, 'difficulty target')
 	
-	fieldIsSha256(sha, 'difficulty target')
+	mask = util.unpackBits(packed, True)
+	leadingZeros = len(mask) - len(mask.lstrip('0'))
+	difficultyUnpacked(mask, leadingZeros, sha, validateParams)
 
-	mask = util.unpackBits(packed).rstrip('0')
-	significant = sha[:len(mask)]
+def difficultyUnpacked(unpackedStripped, leadingZeros, sha, validateParams=True):
+	'''Takes the unpacked form of difficulty and verifies that the hash is less than it.
+
+	Args:
+		unpacked (str): Unpacked target difficulty the provided Sha256 hash must meet.
+		sha (str): Hex target to test, stripped of its leading 0x.
+	'''
+	if validateParams:
+		fieldIsSha256(sha, 'difficulty target')
+	
 	try:
-		if int(mask, 16) <= int(significant, 16):
+		for i in range(0, len(leadingZeros)):
+			if sha[i] != '0':
+				raise Exception('Hash is greater than packed target')
+		significant = sha[:len(unpackedStripped)]
+		if int(unpackedStripped, 16) <= int(significant, 16):
 			raise Exception('Hash is greater than packed target')
 	except:
 		raise Exception('Unable to cast to int from hexidecimal')

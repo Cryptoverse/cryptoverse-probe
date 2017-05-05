@@ -305,7 +305,7 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	nextStarLog['height'] = 0 if isGenesis else nextStarLog['height'] + 1
 	found = False
 	tries = 0
-	checkInterval = 1000000
+	checkInterval = 10000000
 	nextCheck = checkInterval
 	started = datetime.now()
 	lastCheckin = started

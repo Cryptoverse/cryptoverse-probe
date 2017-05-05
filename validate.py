@@ -259,7 +259,7 @@ def difficultyUnpacked(unpackedStripped, leadingZeros, sha, validateParams=True)
 		fieldIsSha256(sha, 'difficulty target')
 	
 	try:
-		for i in range(0, len(leadingZeros)):
+		for i in range(0, leadingZeros):
 			if sha[i] != '0':
 				raise Exception('Hash is greater than packed target')
 		significant = sha[:len(unpackedStripped)]

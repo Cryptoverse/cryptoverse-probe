@@ -23,6 +23,14 @@ def maximumStarLogSize():
 	return int(os.getenv('STARLOGS_MAX_BYTES', '999999'))
 def maximumEventSize():
 	return int(os.getenv('EVENTS_MAX_BYTES', '999999'))
+def cartesianDigits():
+	return int(os.getenv('CARTESIAN_DIGITS', '3'))
+def jumpCostMinimum():
+	return float(os.getenv('JUMP_COST_MIN', '0.01'))
+def jumpCostMaximum():
+	return float(os.getenv('JUMP_COST_MAX', '1.0'))
+def jumpDistanceMaximum():
+	return float(os.getenv('JUMP_DIST_MAX', '256.0'))
 
 maximumNonce = 2147483647
 maximumTarget = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
@@ -42,11 +50,26 @@ shipEventTypes = [
 ]
 
 if not 0 <= difficultyFudge() <= 8:
-	raise ValueError('DIFFICULTY_FUDGE must be a value from 0 to 8 (inclusive)')
+	raise Exception('DIFFICULTY_FUDGE must be a value from 0 to 8 (inclusive)')
 elif 0 < difficultyFudge():
 	prefix = maximumTarget[difficultyFudge():]
 	suffix = maximumTarget[:difficultyFudge()]
 	maximumTarget = prefix + suffix
+
+if not 3 <= cartesianDigits() <= 21:
+	raise Exception('CARTESIAN_DIGITS must be a value from 3 to 21 (inclusive)')
+
+if not 0 <= jumpCostMinimum() < 1:
+	raise Exception('JUMP_COST_MIN must be a value from 0.0 to 1.0 (inclusive - exclusive)')
+
+if not 0 < jumpCostMaximum() <= 1:
+	raise Exception('JUMP_COST_MAX must be a value from 0.0 to 1.0 (exclusive - inclusive)')
+
+if jumpCostMaximum() <= jumpCostMinimum():
+	raise Exception('JUMP_COST_MIN must be less than JUMP_COST_MAX')
+
+if jumpDistanceMaximum() <= 0:
+	raise Exception('JUMP_DIST_MAX must be greater than 0.0')
 
 def isGenesisStarLog(sha):
 	'''Checks if the provided hash could only belong to the parent of the genesis star log.
@@ -391,6 +414,23 @@ def getJumpCost(originHash, destinationHash):
 	'''
 	raise Exception('Not implemented')
 
+def getCartesianMinimum():
+	'''Gets the (x, y, z) position of the minimum possible system.
+	
+	Returns:
+		array: A list containing the (x, y, z) position.
+	'''
+	return numpy.array([0, 0, 0])
+
+def getCartesianMaximum():
+	'''Gets the (x, y, z) position of the maximum possible system.
+	
+	Returns:
+		array: A list containing the (x, y, z) position.
+	'''
+	maxValue = pow(16, cartesianDigits())
+	return numpy.array([maxValue, maxValue, maxValue])
+
 def getCartesian(systemHash):
 	'''Gets the (x, y, z) position of the specified system.
 
@@ -400,8 +440,11 @@ def getCartesian(systemHash):
 	Returns:
 		array: A list containing the (x, y, z) position.
 	'''
-	cartesian = systemHash[-9:]
-	return numpy.array([int(cartesian[:3], 16), int(cartesian[3:-3], 16), int(cartesian[6:], 16)])
+	cartesianHash = sha256('%s%s' % ('cartesian', systemHash))
+	digits = cartesianDigits()
+	totalDigits = digits * 3
+	cartesian = cartesianHash[-totalDigits:]
+	return numpy.array([int(cartesian[:digits], 16), int(cartesian[digits:-digits], 16), int(cartesian[(2*digits):], 16)])
 
 def getDistance(originHash, destinationHash):
 	'''Gets the distance between the specified systems in cartesian space.

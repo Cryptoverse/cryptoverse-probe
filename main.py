@@ -808,13 +808,20 @@ def main():
 	environ['DIFFICULTY_DURATION'] = str(rules['difficulty_duration'])
 	environ['DIFFICULTY_START'] = str(rules['difficulty_start'])
 	environ['SHIP_REWARD'] = str(rules['ship_reward'])
+	environ['CARTESIAN_DIGITS'] = str(rules['cartesian_digits'])
+	environ['JUMP_COST_MIN'] = str(rules['jump_cost_min'])
+	environ['JUMP_COST_MAX'] = str(rules['jump_cost_max'])
+	environ['JUMP_DIST_MAX'] = str(rules['jump_distance_max'])
 	environ['STARLOGS_MAX_BYTES'] = str(rules['star_logs_max_limit'])
 	environ['EVENTS_MAX_BYTES'] = str(rules['events_max_limit'])
 
 	environ['COMMAND_HISTORY'] = getenv('COMMAND_HISTORY', '100')
 
 	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, util.difficultyFudge(), util.difficultyInterval(), util.difficultyDuration(), util.difficultyStart(), util.shipReward())
-	
+	minX, minY, minZ = util.getCartesianMinimum()
+	maxX, maxY, maxZ = util.getCartesianMaximum()
+	universeSize = '( %s, %s, %s ) - ( %s, %s, %s )' % (minX, minY, minZ, maxX, maxY, maxZ)
+	print '\t - Universe Size: %s\n\t - Jump Cost: %s%% to %s%%\n\t - Jump Distance Max: %s' % (universeSize, util.jumpCostMinimum() * 100, util.jumpCostMaximum() * 100, util.jumpDistanceMaximum())
 	if autoRebuild:
 		print 'Automatically rebuilding database...'
 

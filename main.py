@@ -1,6 +1,6 @@
 from json import dumps as jsonDump
 from os import getenv, environ
-from sys import stdout, maxint
+from sys import stdout
 from traceback import print_exc as printException
 from datetime import datetime
 from ete3 import Tree
@@ -309,19 +309,20 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	nextCheck = checkInterval
 	started = datetime.now()
 	lastCheckin = started
+	# This initial hash hangles the hashing of events and such.
 	nextStarLog = util.hashStarLog(nextStarLog)
 	currentDifficulty = util.unpackBits(nextStarLog['difficulty'], True)
 	currentDifficultyLeadingZeros = len(currentDifficulty) - len(currentDifficulty.lstrip('0'))
-	currentNonce = nextStarLog['nonce']
-	logPrefix = nextStarLog['log_header'][:-len(str(currentNonce))]
+	currentNonce = 0
+	logPrefix = util.concatStarLogHeader(nextStarLog, False)
 	currentHash = None
 
-	while not found and tries < maxint:
-		currentNonce += 1
+	while not found:
 		currentHash = util.sha256('%s%s' % (logPrefix, currentNonce))
 		try:
 			validate.difficultyUnpacked(currentDifficulty, currentDifficultyLeadingZeros, currentHash, False)
 			found = True
+			break
 		except:
 			pass
 		if tries == nextCheck:
@@ -331,10 +332,15 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 			hashesPerSecond = tries / elapsedSeconds
 			elapsedMinutes = elapsedSeconds / 60
 			print 'Probing at %.0f hashes per second, %.1f minutes elapsed...' % (hashesPerSecond, elapsedMinutes)
+		currentNonce += 1
+		if util.maximumNonce <= currentNonce:
+			currentNonce = 0
+			nextStarLog['time'] = util.getTime()
+			logPrefix = util.concatStarLogHeader(nextStarLog, False)
 		tries += 1
 	if found:
 		nextStarLog['nonce'] = currentNonce
-		nextStarLog['log_header'] = '%s%s' % (logPrefix, currentNonce)
+		nextStarLog['log_header'] = util.concatStarLogHeader(nextStarLog)
 		nextStarLog['hash'] = currentHash
 	else:
 		raise CommandException('Unable to probe a new starlog')

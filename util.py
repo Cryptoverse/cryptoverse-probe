@@ -24,6 +24,7 @@ def maximumStarLogSize():
 def maximumEventSize():
 	return int(os.getenv('EVENTS_MAX_BYTES', '999999'))
 
+maximumNonce = 2147483647
 maximumTarget = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
 emptyTarget = '0000000000000000000000000000000000000000000000000000000000000000'
 
@@ -162,7 +163,7 @@ def calculateDifficulty(difficulty, duration):
 	
 	return difficultyFromHex(difficultyFromTarget(hex(result)[2:]))
 
-def concatStarLogHeader(starLog):
+def concatStarLogHeader(starLog, includeNonce=True):
 	'''Concats the header information from the provided json.
 	
 	Args:
@@ -171,7 +172,7 @@ def concatStarLogHeader(starLog):
 	Returns:
 		str: Resulting header.
 	'''
-	return '%s%s%s%s%s%s' % (starLog['version'], starLog['previous_hash'], starLog['difficulty'], starLog['events_hash'], starLog['time'], starLog['nonce'])
+	return '%s%s%s%s%s%s' % (starLog['version'], starLog['previous_hash'], starLog['difficulty'], starLog['events_hash'], starLog['time'], starLog['nonce'] if includeNonce else '')
 
 def concatEvent(eventJson):
 	'''Concats the information of an event from the provided json.

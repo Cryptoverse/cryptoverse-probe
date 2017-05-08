@@ -402,17 +402,28 @@ def getEventTypeName(eventId):
 	'''
 	return eventTypes[eventId] if eventId is not None and eventId < len(eventTypes) else eventTypes[0]
 
-def getJumpCost(originHash, destinationHash):
+def getJumpCost(originHash, destinationHash, count=None):
 	'''Gets the floating point scalar for the number of ships that will be lost in this jump.
 
 	Args:
 		originHash (str): The starting hash of the jump.
 		destinationHash (str): The ending hash of the jump.
+		count (int): The number of ships in the jump.
 	
 	Returns:
 		float: A scalar value of the ships lost in the jump.
 	'''
-	raise Exception('Not implemented')
+	distance = getDistance(originHash, destinationHash)
+	maxDistance = jumpDistanceMaximum()
+	costMax = jumpCostMaximum()
+	if maxDistance <= distance:
+		return costMax if count is None else int(math.ceil(costMax * count))
+	# Scalar is x^2
+	scalar = math.sqrt(distance / maxDistance)
+	costMin = jumpCostMinimum()
+	costRange = 1.0 - ((1.0 - costMax) + costMin)
+	scalar = costMin + (costRange * scalar)
+	return scalar if count is None else int(math.ceil(scalar * count))
 
 def getCartesianMinimum():
 	'''Gets the (x, y, z) position of the minimum possible system.

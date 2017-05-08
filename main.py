@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives import serialization
 from getch import getch
 from mpl_toolkits.mplot3d import Axes3D # pylint: disable=unused-import
 from commandException import CommandException
+import matplotlib.colors as pycolors
 import matplotlib.pyplot as pyplot
 import requests
 import database
@@ -519,6 +520,9 @@ def jump(params=None):
 	verbose = putil.retrieve(params, '-v', True, False)
 	render = putil.retrieve(params, '-r', True, False)
 	abort = putil.retrieve(params, '-a', True, False)
+	# lossy = putil.retrieve(params, '-l', True, False)
+	# TODO: Add actual support for non-lossy jumps.
+	lossy = True
 	count = None
 	if putil.hasAny(params):
 		if len(params) < 2:
@@ -547,10 +551,15 @@ def jump(params=None):
 		totalShips += deployment['count']
 	if count is None:
 		count = totalShips
+		lossy = True
 	elif totalShips < count:
 		raise CommandException('Not enough ships to jump from the origin system')
 	if count <= 0:
 		raise CommandException('A number of ships greater than zero must be specified for a jump')
+	# TODO: Insert support for non-lossy jumps here.
+	jumpCost = util.getJumpCost(destinationHash, originHash, count)
+	if jumpCost == count:
+		raise CommandException('Unable to complete a jump where all ships would be lost')
 
 	jumpEvent = {
 		'fleet_hash': fleetHash,
@@ -578,7 +587,7 @@ def jump(params=None):
 	if 0 < extraShips:
 		outputs.append(getEventOutput(index, extraShips, fleetHash, util.sha256('%s%s' % (jumpKey, jumpKey)), originHash, 'jump'))
 		index += 1
-	outputs.append(getEventOutput(index, count, fleetHash, jumpKey, destinationHash, 'jump'))
+	outputs.append(getEventOutput(index, count - jumpCost, fleetHash, jumpKey, destinationHash, 'jump'))
 
 	jumpEvent['inputs'] = inputs
 	jumpEvent['outputs'] = outputs
@@ -595,12 +604,12 @@ def jump(params=None):
 		print 'Posted jump event with response %s%s%s' % (prefix, result, postfix)
 
 def renderJump(originHash, destinationHash):
-	higher = database.getStarLogHighestFromList([originHash, destinationHash])
+	highest = database.getStarLogHighestFromList([originHash, destinationHash])
 	
 	figure = pyplot.figure()
 	axes = figure.add_subplot(111, projection='3d')
 
-	for currentSystem in database.getStarLogHashes(higher):
+	for currentSystem in database.getStarLogHashes(highest):
 		currentPosition = util.getCartesian(currentSystem)
 		xs = [ currentPosition[0], currentPosition[0] ]
 		ys = [ currentPosition[1], currentPosition[1] ]
@@ -620,6 +629,59 @@ def renderJump(originHash, destinationHash):
 	axes.set_ylabel('Y')
 	axes.set_zlabel('Z')
 
+	pyplot.show()
+
+def renderJumpRange(params=None):
+	if not putil.hasAny(params):
+		raise CommandException('Specify an origin system to render the jump range from')
+	originFragment = putil.singleStr(params)
+	destinationFragment = putil.retrieveValue(params, '-d', None)
+
+	hashes = database.getStarLogHashes()
+	originHash = putil.naturalMatch(originFragment, hashes)
+	if originHash is None:
+		raise CommandException('Unable to find an origin system containing %s' % originFragment)
+	destinationHash = None
+	highest = None
+	if destinationFragment is not None:
+		destinationHash = putil.naturalMatch(destinationFragment, hashes)
+		if destinationHash is None:
+			raise CommandException('Unable to find a destination system containing %s' % destinationFragment)
+		if not database.getStarLogsShareChain([originHash, destinationHash]):
+			raise CommandException('Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6]))
+		highest = database.getStarLogHighest(database.getStarLogHighestFromList([originHash, destinationHash]))['hash']
+	
+	figure = pyplot.figure()
+	axes = figure.add_subplot(111, projection='3d')
+	hueStart = 0.327
+	hueEnd = 0.0
+	hueDelta = hueEnd - hueStart
+	for currentSystem in database.getStarLogHashes(highest):
+		cost = util.getJumpCost(originHash, currentSystem)
+		costHue = hueStart + (cost * hueDelta)
+		costValue = 0.0 if cost == 1.0 else 1.0
+		color = pycolors.hsv_to_rgb([costHue, 0.7, costValue])
+		currentPosition = util.getCartesian(currentSystem)
+		xs = [ currentPosition[0], currentPosition[0] ]
+		ys = [ currentPosition[1], currentPosition[1] ]
+		zs = [ 0, currentPosition[2] ]
+		axes.plot(xs, ys, zs, c=color)
+		marker = '^' if currentSystem == originHash else 'o'
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=currentSystem[:6], c=color, marker=marker)
+	if destinationHash is not None:
+		originPosition = util.getCartesian(originHash)
+		destinationPosition = util.getCartesian(destinationHash)
+		xs = [ originPosition[0], destinationPosition[0] ]
+		ys = [ originPosition[1], destinationPosition[1] ]
+		zs = [ originPosition[2], destinationPosition[2] ]
+		axes.plot(xs, ys, zs, linestyle=':')
+	
+	axes.legend()
+	axes.set_title('Jump Range [%s]' % originHash[:6])
+	axes.set_xlabel('X')
+	axes.set_ylabel('Y')
+	axes.set_zlabel('Z')
+	
 	pyplot.show()
 
 def systemPosition(params=None):
@@ -898,6 +960,14 @@ def main():
 				'"-v" prints the jump to the console',
 				'"-r" renders the jump in an external plotter before executing it',
 				'"-a" aborts without posting jump to the server'
+			]
+		),
+		'jrange': createCommand(
+			renderJumpRange,
+			'Renders the range of jumps in an external plotter',
+			[
+				'Passing partial origin hash will render with that system in focus',
+				'"-d" followed by a destination hash will render a line between the best matching system and the origin'
 			]
 		),
 		'pos': createCommand(

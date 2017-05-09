@@ -182,7 +182,9 @@ def event(eventJson, requireIndex=True, requireStarSystem=False, rewardAllowed=T
 	if util.hashEvent(eventJson) != eventJson['hash']:
 		raise Exception('provided hash does not match the calculated one')
 
-	# TODO: Validate signatures
+	fieldIsSha256(eventJson['fleet_hash'], 'fleet_hash')
+	sha256(eventJson['fleet_hash'], eventJson['fleet_key'], 'fleet_key')
+	rsa(util.expandRsaPublicKey(eventJson['fleet_key']), eventJson['signature'], eventJson['hash'])
 
 def eventInput(inputJson):
 	if not isinstance(inputJson['index'], int):

@@ -144,6 +144,8 @@ def account(params=None):
 		accountAll()
 	elif putil.retrieve(params, '-s', True, False):
 		accountSet(putil.retrieveValue(params, '-s', None))
+	elif putil.retrieve(params, '-c', True, False):
+		accountCreate(putil.retrieveValue(params, '-c', None))
 	else:
 		result = database.getAccount()
 		if result:
@@ -165,11 +167,21 @@ def accountAll():
 
 def accountSet(name):
 	if not name:
-		print 'Account cannot be set to None'
+		raise CommandException('Account cannot be set to None')
 	if not database.anyAccount(name):
 		raise CommandException('Unable to find account %s' % name)
 	database.setAccountActive(name)
 	print 'Current account is now "%s"' % name
+
+def accountCreate(name):
+	if not name:
+		raise CommandException('Include a unique name for this account')
+	elif database.anyAccount(name):
+		raise CommandException('An account named "%s" already exists' % name)
+	createdAccount = generateAccount(name)
+	database.addAccount(createdAccount)
+	database.setAccountActive(name)
+	print 'Created and activated account "%s"' % name
 
 def info():
 	print 'Connected to %s with fudge %s, interval %s, duration %s' % (hostUrl, util.difficultyFudge(), util.difficultyInterval(), util.difficultyDuration()) 
@@ -927,7 +939,8 @@ def main():
 			[
 				'Passing no arguments gets the current account information',
 				'"-a" lists all accounts stored in persistent data',
-				'"-s" followed by an account name changes the current account to the specified one'
+				'"-s" followed by an account name changes the current account to the specified one',
+				'"-c" followed by an account name creates a new account'
 			]
 		),
 		'rchain': createCommand(

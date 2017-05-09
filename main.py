@@ -1036,7 +1036,9 @@ def main():
 			attack,
 			'Attack fleets in the specified system',
 			[
-				'Passing a partial origin and enemy fleet hash will attack the best matching fleet'
+				'Passing a partial origin and enemy fleet hash will attack the best matching fleet',
+				'"-v" prints the attack to the console',
+				'"-a" aborts without posting attack to the server'
 			]
 		),
 		'jump': createCommand(

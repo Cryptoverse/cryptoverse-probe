@@ -150,7 +150,7 @@ def account(params=None):
 		result = database.getAccount()
 		if result:
 			print 'Using account "%s"' % result['name']
-			print '\tFleet Hash: [%s]' % util.sha256(result['public_key'])[:6]
+			print '\tFleet Hash: (%s)' % util.sha256(result['public_key'])[:6]
 		else:
 			print 'No active account'
 
@@ -159,7 +159,7 @@ def accountAll():
 	accounts = database.getAccounts()
 	if accounts:
 		message = 'Persistent data contains the following account entries'
-		entryMessage = '\n%s\t- %s\n\t\tFleet Hash: [%s]'
+		entryMessage = '\n%s\t- %s\n\t\tFleet Hash: (%s)'
 		for currentAccount in accounts:
 			activeFlag = '[CURR] ' if currentAccount['active'] else ''
 			message += entryMessage % (activeFlag, currentAccount['name'], util.sha256(currentAccount['public_key'])[:6])
@@ -484,7 +484,7 @@ def listDeployments(params=None):
 		fleetKeys = fleets.keys()
 		for i in range(0, len(fleets)):
 			currentFleet = fleetKeys[i]
-			result += '\n - [%s] : %s' % (currentFleet[:6], fleets[currentFleet])
+			result += '\n - (%s) : %s' % (currentFleet[:6], fleets[currentFleet])
 		
 	print result
 
@@ -522,10 +522,77 @@ def listAllDeployments(fromStarLog, verbose):
 				currentFleet = fleetKeys[f]
 				fleetCount = systems[currentSystem][currentFleet]
 				activeFlag = '[CURR] ' if currentFleet == accountHash else ''
-				result += '\n%s\t - [%s] : %s' % (activeFlag, currentFleet[:6], fleetCount)
+				result += '\n%s\t - (%s) : %s' % (activeFlag, currentFleet[:6], fleetCount)
 		
 	print result
 	
+def attack(params=None):
+	if not putil.hasAtLeast(params, 2):
+		raise CommandException('An origin system and fleet must be specified')
+	verbose = putil.retrieve(params, '-v', True, False)
+	abort = putil.retrieve(params, '-a', True, False)
+	originFragment = params[0]
+	enemyFragment = params[1]
+	originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
+	if originHash is None:
+		raise CommandException('Unable to find an origin system containing %s' % originFragment)
+	highestHash = database.getStarLogHighest(originHash)['hash']
+	enemyHash = putil.naturalMatch(enemyFragment, database.getFleets(highestHash))
+	if enemyHash is None:
+		raise CommandException('Unable to find a fleet containing %s' % enemyFragment)
+	enemyDeployments = database.getUnusedEvents(highestHash, originHash, enemyHash)
+	if enemyDeployments is None:
+		raise CommandException('Fleet (%s) has no ships deployed in [%s]' % (enemyHash[:6], originHash[:6]))
+	accountInfo = database.getAccount()
+	friendlyHash = util.sha256(accountInfo['public_key'])
+	friendlyDeployments = database.getUnusedEvents(highestHash, originHash, friendlyHash)
+	friendlyCount = 0
+	for friendlyDeployment in friendlyDeployments:
+		friendlyCount += friendlyDeployment['count']
+	if friendlyCount == 0:
+		raise CommandException('None of your fleet is deployed to [%s]' % originHash[:6])
+	
+	# TODO: Break this out into its own get call.
+	attackEvent = {
+		'fleet_hash': friendlyHash,
+		'fleet_key': accountInfo['public_key'],
+		'hash': None,
+		'inputs': [],
+		'outputs': [],
+		'signature': None,
+		'type': 'attack'
+	}
+
+	inputIndex = 0
+	enemyCount = 0
+	for enemyDeployment in enemyDeployments:
+		attackEvent['inputs'].append(getEventInput(inputIndex, enemyDeployment['key']))
+		enemyCount += enemyDeployment['count']
+		inputIndex += 1
+		if friendlyCount <= enemyCount:
+			break
+	friendlyCount = 0
+	for friendlyDeployment in friendlyDeployments:
+		attackEvent['inputs'].append(getEventInput(inputIndex, friendlyDeployment['key']))
+		friendlyCount += friendlyDeployment['count']
+		inputIndex += 1
+		if enemyCount <= friendlyCount:
+			break
+	if enemyCount < friendlyCount:
+		attackEvent['outputs'].append(getEventOutput(0, friendlyCount - enemyCount, friendlyHash, util.getUniqueKey(), originHash, 'attack'))
+	elif friendlyCount < enemyCount:
+		attackEvent['outputs'].append(getEventOutput(0, enemyCount - friendlyCount, enemyHash, util.getUniqueKey(), originHash, 'attack'))
+	
+	attackEvent['hash'] = util.hashEvent(attackEvent)
+	attackEvent['signature'] = util.rsaSign(accountInfo['private_key'], attackEvent['hash'])
+
+	if verbose:
+		print prettyJson(attackEvent)
+	if not abort:
+		result = postRequest(eventsUrl, attackEvent)
+		prefix, postfix = successColor if result == 200 else errorColor, defaultColor
+		print 'Posted attack event with response %s%s%s' % (prefix, result, postfix)
+
 def jump(params=None):
 	originFragment = None
 	destinationFragment = None
@@ -573,6 +640,7 @@ def jump(params=None):
 	if jumpCost == count:
 		raise CommandException('Unable to complete a jump where all ships would be lost')
 
+	# TODO: Break this out into its own get call.
 	jumpEvent = {
 		'fleet_hash': fleetHash,
 		'fleet_key': accountInfo['public_key'],
@@ -597,7 +665,7 @@ def jump(params=None):
 	index = 0
 	jumpKey = util.sha256('%s%s%s%s' % (util.getTime(), fleetHash, originHash, destinationHash))
 	if 0 < extraShips:
-		outputs.append(getEventOutput(index, extraShips, fleetHash, util.sha256('%s%s' % (jumpKey, jumpKey)), originHash, 'jump'))
+		outputs.append(getEventOutput(index, extraShips, fleetHash, util.getUniqueKey(), originHash, 'jump'))
 		index += 1
 	outputs.append(getEventOutput(index, count - jumpCost, fleetHash, jumpKey, destinationHash, 'jump'))
 
@@ -962,6 +1030,13 @@ def main():
 				'Passing a partial hash will list deployments in the best matching system',
 				'"-a" lists all systems with deployments',
 				'"-f" looks for deployments on the chain with the matching head'
+			]
+		),
+		'attack': createCommand(
+			attack,
+			'Attack fleets in the specified system',
+			[
+				'Passing a partial origin and enemy fleet hash will attack the best matching fleet'
 			]
 		),
 		'jump': createCommand(

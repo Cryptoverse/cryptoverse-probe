@@ -4,6 +4,7 @@ import binascii
 import time
 import math
 import numpy
+import uuid
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -470,6 +471,14 @@ def getDistance(originHash, destinationHash):
 	originPos = getCartesian(originHash)
 	destinationPos = getCartesian(destinationHash)
 	return int(math.ceil(numpy.linalg.norm(originPos - destinationPos)))
+
+def getUniqueKey():
+	'''The sha256 of a unique id.
+
+	Returns:
+		str: The sha256 of a unique id.
+	'''
+	return sha256(str(uuid.uuid4()))
 
 def getTime():
 	'''UTC time in seconds.

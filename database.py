@@ -315,3 +315,16 @@ def anyEventsUsed(events, fromStarLog=None):
 					return True
 		fromStarLog = system['previous_hash']
 	return False
+
+def getFleets(fromStarLog=None):
+	if fromStarLog is None:
+		fromStarLog = getStarLogHighest()['hash']
+	results = []
+	while not util.isGenesisStarLog(fromStarLog):
+		system = getStarLog(fromStarLog)
+		for event in system['events']:
+			for eventOutput in event['outputs']:
+				if eventOutput['fleet_hash'] not in results:
+					results.append(eventOutput['fleet_hash'])
+		fromStarLog = system['previous_hash']
+	return results

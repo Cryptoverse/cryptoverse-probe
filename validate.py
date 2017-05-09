@@ -123,6 +123,16 @@ def events(eventsJson):
 					raise Exception('jump events cannot jump zero or less ships')
 				if currentOutput['type'] != 'jump':
 					raise Exception('jump outputs must be of type "jump"')
+		elif currentEvent['type'] == 'attack':
+			if len(currentEvent['inputs']) < 2:
+				raise Exception('attack events need at least two inputs')
+			if len(currentEvent['inputs']) < len(currentEvent['outputs']):
+				raise Exception('attacks cannot have more outputs than inputs')
+			for currentOutput in currentEvent['outputs']:
+				if currentOutput['count'] <= 0:
+					raise Exception('attack events cannot outputs zero or less ships')
+				if currentOutput['attack'] != 'attack':
+					raise Exception('attack outputs must be of type "attack"')
 		else:
 			raise ValueError('unrecognized event of type %s' % currentEvent['type'])
 		
@@ -160,7 +170,7 @@ def event(eventJson, requireIndex=True, requireStarSystem=False, rewardAllowed=T
 
 	if not rewardAllowed and eventJson['type'] == 'reward':
 		raise Exception('event of type %s forbidden' % eventJson['type'])
-	if eventJson['type'] not in ['reward', 'jump']:
+	if eventJson['type'] not in ['reward', 'jump', 'attack']:
 		raise Exception('unrecognized event of type %s' % eventJson['type'])
 
 	inputIndices = []

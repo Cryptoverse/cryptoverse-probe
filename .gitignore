@@ -87,3 +87,5 @@ ENV/
 
 # Rope project settings
 .ropeproject
+persistent.json
+local.db

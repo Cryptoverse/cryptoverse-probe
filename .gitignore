@@ -89,3 +89,7 @@ ENV/
 .ropeproject
 persistent.json
 local.db
+pip-selfcheck.json
+bin
+include
+ete3

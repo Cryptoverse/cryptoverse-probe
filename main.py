@@ -8,20 +8,24 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from getch import getch
-from mpl_toolkits.mplot3d import Axes3D # pylint: disable=unused-import
 from commandException import CommandException
-import matplotlib.colors as pycolors
-import matplotlib.pyplot as pyplot
 import requests
 import database
 import util
 import validate
 import parameterUtil as putil
 
+import matplotlib
+matplotlib.use('TkAgg')
+
+from mpl_toolkits.mplot3d import Axes3D # pylint: disable=unused-import
+import matplotlib.colors as pycolors
+import matplotlib.pyplot as pyplot
+
 autoRebuild = int(getenv('AUTO_REBUILD', '0')) == 1
 
-# commandHistoryLimit = int(getenv('COMMAND_HISTORY', '100'))
-hostUrl = getenv('HOST_URL', 'http://localhost:5000')
+# hostUrl = getenv('HOST_URL', 'http://localhost:5000')
+hostUrl = getenv('HOST_URL', 'http://api.cryptoverse.io')
 rulesUrl = hostUrl + '/rules'
 chainsUrl = hostUrl + '/chains'
 starLogsUrl = hostUrl + '/star-logs'

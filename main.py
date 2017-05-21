@@ -212,6 +212,7 @@ def probe(params=None):
 		fromHash = putil.naturalMatch(fromQuery, database.getStarLogHashes())
 		if fromHash is None:
 			raise CommandException('Unable to find a system hash containing %s' % fromQuery)
+	sync('-s')
 	generated = None
 	started = datetime.now()
 	while generated is None:

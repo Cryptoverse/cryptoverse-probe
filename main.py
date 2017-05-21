@@ -554,7 +554,7 @@ def attack(params=None):
 	for friendlyDeployment in friendlyDeployments:
 		friendlyCount += friendlyDeployment['count']
 	if friendlyCount == 0:
-		raise CommandException('None of your fleet is deployed to %s' % util.getSystemName(originHash)
+		raise CommandException('None of your fleet is deployed to %s' % util.getSystemName(originHash))
 	
 	# TODO: Break this out into its own get call.
 	attackEvent = {

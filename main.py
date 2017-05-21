@@ -39,12 +39,8 @@ cursorEraseSequence = '\033[K'
 cursorForwardSequence = '\033[%sC'
 
 if platform.startswith('win'):
-	defaultColor = ''
-	successColor = ''
-	errorColor = ''
-	boldColor = ''
-	cursorEraseSequence = 'ESC [ 1 K'
-	cursorForwardSequence = 'ESC [ %s C'
+	from colorama import init
+	init()
 
 def getGenesis():
 	return {

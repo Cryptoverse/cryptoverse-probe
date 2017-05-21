@@ -8,7 +8,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from getch import getch
-from commandException import CommandException
+from probeExceptions import CommandException, ProbeTimeoutException
 import requests
 import database
 import util
@@ -206,12 +206,19 @@ def probe(params=None):
 	silent = putil.retrieve(params, '-s', True, False)
 	allowDuplicateEvents = putil.retrieve(params, '-d', True, False)
 	fromQuery = putil.retrieveValue(params, '-f', None)
+	loop = putil.retrieve(params, '-l', True, False)
 	fromHash = None
 	if fromQuery is not None:
 		fromHash = putil.naturalMatch(fromQuery, database.getStarLogHashes())
 		if fromHash is None:
 			raise CommandException('Unable to find a system hash containing %s' % fromQuery)
-	generated = generateNextStarLog(fromHash, fromGenesis, allowDuplicateEvents)
+	generated = None
+	started = datetime.now()
+	while generated is None:
+		try:
+			generated = generateNextStarLog(fromHash, fromGenesis, allowDuplicateEvents, started)
+		except ProbeTimeoutException:
+			sync('-s')
 	if not silent:
 		print 'Probed new starlog %s' % util.getSystemName(generated['hash'])
 		if verbose:
@@ -228,8 +235,10 @@ def probe(params=None):
 	except:
 		printException()
 		print 'Something went wrong when trying to post the generated starlog'
+	if loop:
+		probe(params)
 
-def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvents=False):
+def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvents=False, startTime=None, timeout=180):
 	nextStarLog = getGenesis()
 	if fromStarLog:
 		nextStarLog = database.getStarLog(fromStarLog)
@@ -324,8 +333,9 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	tries = 0
 	checkInterval = 10000000
 	nextCheck = checkInterval
-	started = datetime.now()
-	lastCheckin = started
+	currStarted = datetime.now()
+	started = currStarted if startTime is None else startTime
+	lastCheckin = currStarted
 	# This initial hash hangles the hashing of events and such.
 	nextStarLog = util.hashStarLog(nextStarLog)
 	currentDifficulty = util.unpackBits(nextStarLog['difficulty'], True)
@@ -344,11 +354,12 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 			pass
 		if tries == nextCheck:
 			nextCheck = tries + checkInterval
-			lastCheckin = datetime.now()
-			elapsedSeconds = (lastCheckin - started).total_seconds()
-			hashesPerSecond = tries / elapsedSeconds
-			elapsedMinutes = elapsedSeconds / 60
-			print 'Probing at %.0f hashes per second, %.1f minutes elapsed...' % (hashesPerSecond, elapsedMinutes)
+			now = datetime.now()
+			if timeout < (now - currStarted).total_seconds():
+				raise ProbeTimeoutException('Probing timed out')
+			hashesPerSecond = tries / (now - lastCheckin).total_seconds()
+			elapsedMinutes = (now - started).total_seconds() / 60
+			print '\tProbing at %.0f hashes per second, %.1f minutes elapsed...' % (hashesPerSecond, elapsedMinutes)
 		currentNonce += 1
 		if util.maximumNonce <= currentNonce:
 			currentNonce = 0
@@ -1002,7 +1013,8 @@ def main():
 				'"-s" silently executes the command',
 				'"-a" aborts without posting starlog to the server',
 				'"-d" allow duplicate events',
-				'"-f" probes for a starlog ontop of the best matching system'
+				'"-f" probes for a starlog ontop of the best matching system',
+				'"-l" loop and probe again after posting to the server'
 			]
 		),
 		'account': createCommand(

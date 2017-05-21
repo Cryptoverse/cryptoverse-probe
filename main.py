@@ -1,6 +1,6 @@
 from json import dumps as jsonDump
 from os import getenv, environ
-from sys import stdout
+from sys import stdout, platform
 from traceback import print_exc as printException
 from datetime import datetime
 from ete3 import Tree
@@ -35,6 +35,12 @@ defaultColor = '\033[0m'
 successColor = '\033[92m'
 errorColor = '\033[91m'
 boldColor = '\033[1m'
+
+if platform.startswith('win'):
+	defaultColor = ''
+	successColor = ''
+	errorColor = ''
+	boldColor = ''
 
 def getGenesis():
 	return {

@@ -35,12 +35,16 @@ defaultColor = '\033[0m'
 successColor = '\033[92m'
 errorColor = '\033[91m'
 boldColor = '\033[1m'
+cursorEraseSequence = '\033[K'
+cursorForwardSequence = '\033[%sC'
 
 if platform.startswith('win'):
 	defaultColor = ''
 	successColor = ''
 	errorColor = ''
 	boldColor = ''
+	cursorEraseSequence = 'ESC [ 1 K'
+	cursorForwardSequence = 'ESC [ %s C'
 
 def getGenesis():
 	return {
@@ -1132,8 +1136,8 @@ def main():
 		
 		if command is None:
 			command = ''
-			stdout.write('\r%s%s\033[K' % (commandPrefix, command))
-			stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
+			stdout.write('\r%s%s%s' % (commandPrefix, command, cursorEraseSequence))
+			stdout.write('\r%s' % (cursorForwardSequence % (commandIndex + len(commandPrefix))))
 
 		alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight, isTab, isDoubleEscape = pollInput()
 		oldCommandIndex = commandIndex
@@ -1175,9 +1179,9 @@ def main():
 			commandIndex += 1
 
 		if oldCommand != command:
-			stdout.write('\r%s%s%s%s\033[K' % (commandPrefix, boldColor, command, defaultColor))
+			stdout.write('\r%s%s%s%s%s' % (commandPrefix, boldColor, command, defaultColor, cursorEraseSequence))
 		if oldCommandIndex != commandIndex:
-			stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
+			stdout.write('\r%s' % (cursorForwardSequence % (commandIndex + len(commandPrefix))))
 
 		if isReturn or isDoubleEscape:
 			stdout.write('\n')

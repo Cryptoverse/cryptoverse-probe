@@ -154,7 +154,7 @@ def account(params=None):
 		result = database.getAccount()
 		if result:
 			print 'Using account "%s"' % result['name']
-			print '\tFleet Hash: (%s)' % util.sha256(result['public_key'])[:6]
+			print '\tFleet Hash: %s' % util.getFleetHashName(result['public_key'])
 		else:
 			print 'No active account'
 
@@ -163,10 +163,10 @@ def accountAll():
 	accounts = database.getAccounts()
 	if accounts:
 		message = 'Persistent data contains the following account entries'
-		entryMessage = '\n%s\t- %s\n\t\tFleet Hash: (%s)'
+		entryMessage = '\n%s\t- %s\n\t\tFleet Hash: %s'
 		for currentAccount in accounts:
 			activeFlag = '[CURR] ' if currentAccount['active'] else ''
-			message += entryMessage % (activeFlag, currentAccount['name'], util.sha256(currentAccount['public_key'])[:6])
+			message += entryMessage % (activeFlag, currentAccount['name'], util.getFleetHashName(currentAccount['public_key']))
 	print message
 
 def accountSet(name):
@@ -213,7 +213,7 @@ def probe(params=None):
 			raise CommandException('Unable to find a system hash containing %s' % fromQuery)
 	generated = generateNextStarLog(fromHash, fromGenesis, allowDuplicateEvents)
 	if not silent:
-		print 'Probed new starlog %s' % generated['hash'][:6]
+		print 'Probed new starlog %s' % util.getSystemName(generated['hash'])
 		if verbose:
 			print prettyJson(generated)
 	if not post:
@@ -424,11 +424,11 @@ def renderChain(params=None):
 		stratum = strata[i]
 		if i == 0:
 			for orphan in stratum[1]:
-				lastNode.add_child(name=orphan['hash'][:6])
+				lastNode.add_child(name=util.getSystemName(orphan['hash']))
 		else:
 			lastNode = lastNode.add_child()
 			for orphan in stratum[1]:
-				lastNode.add_sister(name=orphan['hash'][:6])
+				lastNode.add_sister(name=util.getSystemName(orphan['hash']))
 		
 	print tree
 
@@ -442,7 +442,7 @@ def renderSystems(params=None):
 		ys = [ currentPosition[1], currentPosition[1] ]
 		zs = [ 0, currentPosition[2] ]
 		axes.plot(xs, ys, zs)
-		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=currentSystem[:6])
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=util.getSystemName(currentSystem))
 	
 	axes.legend()
 	axes.set_title('Systems')
@@ -482,13 +482,13 @@ def listDeployments(params=None):
 			fleets[fleet] += count
 		else:
 			fleets[fleet] = count
-	result = 'No deployments in system [%s]' % selectedHash[:6]
+	result = 'No deployments in system %s' % util.getSystemName(selectedHash)
 	if fleets:
-		result = 'Deployments in star system [%s]' % selectedHash[:6]
+		result = 'Deployments in star system %s' % util.getSystemName(selectedHash)
 		fleetKeys = fleets.keys()
 		for i in range(0, len(fleets)):
 			currentFleet = fleetKeys[i]
-			result += '\n - (%s) : %s' % (currentFleet[:6], fleets[currentFleet])
+			result += '\n - %s : %s' % (util.getFleetName(currentFleet), fleets[currentFleet])
 		
 	print result
 
@@ -520,13 +520,13 @@ def listAllDeployments(fromStarLog, verbose):
 		systemKeys = systems.keys()
 		for i in range(0, len(systemKeys)):
 			currentSystem = systemKeys[i]
-			result += '\n - [%s]' % currentSystem[:6]
+			result += '\n - %s' % util.getSystemName(currentSystem)
 			fleetKeys = systems[currentSystem].keys()
 			for f in range(0, len(fleetKeys)):
 				currentFleet = fleetKeys[f]
 				fleetCount = systems[currentSystem][currentFleet]
 				activeFlag = '[CURR] ' if currentFleet == accountHash else ''
-				result += '\n%s\t - (%s) : %s' % (activeFlag, currentFleet[:6], fleetCount)
+				result += '\n%s\t - %s : %s' % (activeFlag, util.getFleetName(currentFleet), fleetCount)
 		
 	print result
 	
@@ -546,7 +546,7 @@ def attack(params=None):
 		raise CommandException('Unable to find a fleet containing %s' % enemyFragment)
 	enemyDeployments = database.getUnusedEvents(highestHash, originHash, enemyHash)
 	if enemyDeployments is None:
-		raise CommandException('Fleet (%s) has no ships deployed in [%s]' % (enemyHash[:6], originHash[:6]))
+		raise CommandException('Fleet %s has no ships deployed in %s' % (util.getFleetName(enemyHash), util.getSystemName(originHash)))
 	accountInfo = database.getAccount()
 	friendlyHash = util.sha256(accountInfo['public_key'])
 	friendlyDeployments = database.getUnusedEvents(highestHash, originHash, friendlyHash)
@@ -554,7 +554,7 @@ def attack(params=None):
 	for friendlyDeployment in friendlyDeployments:
 		friendlyCount += friendlyDeployment['count']
 	if friendlyCount == 0:
-		raise CommandException('None of your fleet is deployed to [%s]' % originHash[:6])
+		raise CommandException('None of your fleet is deployed to %s' % util.getSystemName(originHash)
 	
 	# TODO: Break this out into its own get call.
 	attackEvent = {
@@ -624,7 +624,7 @@ def jump(params=None):
 	if destinationHash is None:
 		raise CommandException('Unable to find a destination system containing %s' % destinationFragment)
 	if not database.getStarLogsShareChain([originHash, destinationHash]):
-		raise CommandException('Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6]))
+		raise CommandException('Systems %s and %s exist on different chains' % (util.getSystemName(originHash), util.getSystemName(destinationHash)))
 	highestHash = database.getStarLogHighest(database.getStarLogHighestFromList([originHash, destinationHash]))['hash']
 	accountInfo = database.getAccount()
 	fleetHash = util.sha256(accountInfo['public_key'])
@@ -699,7 +699,7 @@ def renderJump(originHash, destinationHash):
 		ys = [ currentPosition[1], currentPosition[1] ]
 		zs = [ 0, currentPosition[2] ]
 		axes.plot(xs, ys, zs)
-		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=currentSystem[:6])
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=util.getSystemName(currentSystem))
 	originPosition = util.getCartesian(originHash)
 	destinationPosition = util.getCartesian(destinationHash)
 	xs = [ originPosition[0], destinationPosition[0] ]
@@ -708,7 +708,7 @@ def renderJump(originHash, destinationHash):
 	axes.plot(xs, ys, zs, linestyle=':')
 	
 	axes.legend()
-	axes.set_title('Jump [%s] -> [%s]' % (originHash[:6], destinationHash[:6]))
+	axes.set_title('Jump %s -> %s' % (util.getSystemName(originHash), util.getSystemName(destinationHash)))
 	axes.set_xlabel('X')
 	axes.set_ylabel('Y')
 	axes.set_zlabel('Z')
@@ -732,7 +732,7 @@ def renderJumpRange(params=None):
 		if destinationHash is None:
 			raise CommandException('Unable to find a destination system containing %s' % destinationFragment)
 		if not database.getStarLogsShareChain([originHash, destinationHash]):
-			raise CommandException('Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6]))
+			raise CommandException('Systems %s and %s exist on different chains' % (util.getSystemName(originHash), util.getSystemName(destinationHash)))
 		highest = database.getStarLogHighest(database.getStarLogHighestFromList([originHash, destinationHash]))['hash']
 	
 	figure = pyplot.figure()
@@ -751,7 +751,7 @@ def renderJumpRange(params=None):
 		zs = [ 0, currentPosition[2] ]
 		axes.plot(xs, ys, zs, c=color)
 		marker = '^' if currentSystem == originHash else 'o'
-		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=currentSystem[:6], c=color, marker=marker)
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=util.getSystemName(currentSystem), c=color, marker=marker)
 	if destinationHash is not None:
 		originPosition = util.getCartesian(originHash)
 		destinationPosition = util.getCartesian(destinationHash)
@@ -761,7 +761,7 @@ def renderJumpRange(params=None):
 		axes.plot(xs, ys, zs, linestyle=':')
 	
 	axes.legend()
-	axes.set_title('Jump Range [%s]' % originHash[:6])
+	axes.set_title('Jump Range %s' % util.getSystemName(originHash))
 	axes.set_xlabel('X')
 	axes.set_ylabel('Y')
 	axes.set_zlabel('Z')
@@ -775,7 +775,7 @@ def systemPosition(params=None):
 	originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
 	if originHash is None:
 		raise CommandException('Unable to find an origin system containing %s' % originFragment)
-	print '[%s] system is at %s' % (originHash[:6], util.getCartesian(originHash))
+	print '%s system is at %s' % (util.getSystemName(originHash), util.getCartesian(originHash))
 
 def systemDistance(params=None):
 	if not putil.hasCount(params, 2):
@@ -790,8 +790,8 @@ def systemDistance(params=None):
 	if destinationHash is None:
 		raise CommandException('Unable to find a destination system containing %s' % destinationFragment)
 	if not database.getStarLogsShareChain([originHash, destinationHash]):
-		raise CommandException('Systems [%s] and [%s] exist on different chains' % (originHash[:6], destinationHash[:6]))
-	print 'Distance between [%s] and [%s] is %s' % (originHash[:6], destinationHash[:6], util.getDistance(originHash, destinationHash))
+		raise CommandException('Systems %s and %s exist on different chains' % (util.getSystemName(originHash), util.getSystemName(destinationHash)))
+	print 'Distance between %s and %s is %s' % (util.getSystemName(originHash), util.getSystemName(destinationHash), util.getDistance(originHash, destinationHash))
 
 def systemAverageDistances(params=None):
 	originHash = None
@@ -822,7 +822,7 @@ def systemAverageDistances(params=None):
 		if originHash is None:
 			print 'Average distance between all systems is %s' % average
 		else:
-			print 'Average distance to system [%s] is %s' % (originHash[:6], average)
+			print 'Average distance to system %s is %s' % (util.getSystemName(originHash), average)
 
 def systemMaximumDistance(params=None):
 	systemMinMaxDistance(params)
@@ -848,7 +848,7 @@ def systemMinMaxDistance(params=None, calculatingMax=True):
 			if (calculatingMax and bestDistance < dist) or (not calculatingMax and dist < bestDistance):
 				bestSystem = currentHash
 				bestDistance = dist
-		print '%s system from [%s] is [%s], with a distance of %s' % (modifier, originHash[:6], bestSystem[:6], bestDistance)
+		print '%s system from %s is %s, with a distance of %s' % (modifier, util.getSystemName(originHash), util.getSystemName(bestSystem), bestDistance)
 	else:
 		hashes = database.getStarLogHashes(fromHighest=True)
 		bestSystemOrigin = None
@@ -862,7 +862,7 @@ def systemMinMaxDistance(params=None, calculatingMax=True):
 					bestSystemOrigin = currentHash
 					bestSystemDestination = targetHash
 					bestDistance = dist
-		print '%s systems are [%s] and [%s], with a distance of %s' % (modifier, bestSystemOrigin[:6], bestSystemDestination[:6], bestDistance)
+		print '%s systems are %s and %s, with a distance of %s' % (modifier, util.getSystemName(bestSystemOrigin), util.getSystemName(bestSystemDestination), bestDistance)
 
 def pollInput():
 	returnSequence = [ 13 ]

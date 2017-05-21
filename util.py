@@ -480,6 +480,59 @@ def getUniqueKey():
 	'''
 	return sha256(str(uuid.uuid4()))
 
+def getFleetHashName(strippedPublicKey, length=6):
+	'''Gets the human readable name for a fleet by hashing and shortening its stripped public key.
+
+	Args:
+		strippedPublicKey (str): The fleet's public key after stripping.
+		length (int): The length of the shortened name.
+	
+	Returns:
+		str: The shortened name.
+	'''
+	return getFleetName(sha256(strippedPublicKey), length)
+
+def getFleetName(fleetHash, length=6):
+	'''Gets the human readable name for a fleet.
+
+	Args:
+		fleetHash (str): The fleet's Sha256 hash.
+		length (int): The length of the shortened name.
+	
+	Returns:
+		str: The shortened name.
+	'''
+	return '(%s)' % getShortenedHash(fleetHash, length, False)
+
+def getSystemName(systemHash, length=6):
+	'''Gets the human readable name for a system.
+
+	Args:
+		systemHash (str): The system's Sha256 hash.
+		length (int): The length of the shortened name.
+	
+	Returns:
+		str: The shortened name.
+	'''
+	return '[%s]' % getShortenedHash(systemHash, length)
+	
+def getShortenedHash(sha, length=6, stripZeros=True):
+	'''Gets the human readable name for a hash.
+
+	Args:
+		sha (str): The Sha256 hash.
+		length (int): The length of the shortened name.
+	
+	Returns:
+		str: The shortened name.
+	'''
+	if stripZeros:
+		sha = sha.lstrip('0')
+	if len(sha) <= length:
+		return sha
+	else:
+		return sha[:length]
+
 def getTime():
 	'''UTC time in seconds.
 

@@ -1,15 +1,24 @@
-import os
+import sys
+from os import getenv
+from os.path import dirname as directoryName, join as joinPaths
 import sqlite3
 import json
 import util
 
 databaseFileName = 'local.db'
 
+if getattr(sys, 'frozen', False):
+	applicationPath = directoryName(sys.executable)
+elif __file__:
+	applicationPath = directoryName(__file__)
+
+databaseLocation = joinPaths(applicationPath, databaseFileName)
+
 def commandHistoryLimit():
-	return int(os.getenv('COMMAND_HISTORY', '100'))
+	return int(getenv('COMMAND_HISTORY', '100'))
 
 def begin():
-	connection = sqlite3.connect(databaseFileName)
+	connection = sqlite3.connect(databaseLocation)
 	cursor = connection.cursor()
 	return connection, cursor
 

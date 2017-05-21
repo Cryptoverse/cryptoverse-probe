@@ -35,12 +35,8 @@ defaultColor = '\033[0m'
 successColor = '\033[92m'
 errorColor = '\033[91m'
 boldColor = '\033[1m'
-
-if platform.startswith('win'):
-	defaultColor = ''
-	successColor = ''
-	errorColor = ''
-	boldColor = ''
+cursorEraseSequence = '\033[K'
+cursorForwardSequence = '\033[%sC'
 
 def getGenesis():
 	return {
@@ -883,15 +879,26 @@ def systemMinMaxDistance(params=None, calculatingMax=True):
 		print '%s systems are %s and %s, with a distance of %s' % (modifier, util.getSystemName(bestSystemOrigin), util.getSystemName(bestSystemDestination), bestDistance)
 
 def pollInput():
-	returnSequence = [ 13 ]
-	upSequence = [ 27, 91, 65 ]
-	downSequence = [ 27, 91, 66 ]
-	leftSequence = [ 27, 91, 68 ]
-	rightSequence = [ 27, 91, 67 ]
-	backSequence = [ 127 ]
-	controlCSequence = [ 3 ]
-	tabSequence = [ 9 ]
-	doubleEscapeSequence = [ 27, 27 ]
+	if platform.startswith('win'):
+		returnSequence = [ 13 ]
+		upSequence = [ 224, 72 ]
+		downSequence = [ 224, 80 ]
+		leftSequence = [ 224, 75 ]
+		rightSequence = [ 224, 77 ]
+		backSequence = [ 8 ]
+		controlCSequence = [ 3 ]
+		tabSequence = [ 9 ]
+		doubleEscapeSequence = [ 27, 27 ]
+	else:
+		returnSequence = [ 13 ]
+		upSequence = [ 27, 91, 65 ]
+		downSequence = [ 27, 91, 66 ]
+		leftSequence = [ 27, 91, 68 ]
+		rightSequence = [ 27, 91, 67 ]
+		backSequence = [ 127 ]
+		controlCSequence = [ 3 ]
+		tabSequence = [ 9 ]
+		doubleEscapeSequence = [ 27, 27 ]
 
 	specialSequences = [
 		tabSequence,
@@ -1132,8 +1139,8 @@ def main():
 		
 		if command is None:
 			command = ''
-			stdout.write('\r%s%s\033[K' % (commandPrefix, command))
-			stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
+			stdout.write('\r%s%s%s' % (commandPrefix, command, cursorEraseSequence))
+			stdout.write('\r%s' % (cursorForwardSequence % (commandIndex + len(commandPrefix))))
 
 		alphaNumeric, isReturn, isBackspace, isControlC, isUp, isDown, isLeft, isRight, isTab, isDoubleEscape = pollInput()
 		oldCommandIndex = commandIndex
@@ -1175,9 +1182,9 @@ def main():
 			commandIndex += 1
 
 		if oldCommand != command:
-			stdout.write('\r%s%s%s%s\033[K' % (commandPrefix, boldColor, command, defaultColor))
+			stdout.write('\r%s%s%s%s%s' % (commandPrefix, boldColor, command, defaultColor, cursorEraseSequence))
 		if oldCommandIndex != commandIndex:
-			stdout.write('\r\033[%sC' % (commandIndex + len(commandPrefix)))
+			stdout.write('\r%s' % (cursorForwardSequence % (commandIndex + len(commandPrefix))))
 
 		if isReturn or isDoubleEscape:
 			stdout.write('\n')

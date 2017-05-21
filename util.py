@@ -3,8 +3,8 @@ import hashlib
 import binascii
 import time
 import math
-import numpy
 import uuid
+import numpy
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 def difficultyFudge():
 	return int(os.getenv('DIFFICULTY_FUDGE', '0'))
 def difficultyInterval():
-	return int(os.getenv('DIFFICULTY_INTERVAL', '7560'))
+	return int(os.getenv('DIFFICULTY_INTERVAL', '10080'))
 def difficultyDuration():
 	return int(os.getenv('DIFFICULTY_DURATION', '1209600'))
 def difficultyStart():
@@ -31,7 +31,7 @@ def jumpCostMinimum():
 def jumpCostMaximum():
 	return float(os.getenv('JUMP_COST_MAX', '1.0'))
 def jumpDistanceMaximum():
-	return float(os.getenv('JUMP_DIST_MAX', '256.0'))
+	return float(os.getenv('JUMP_DIST_MAX', '2048.0'))
 
 maximumNonce = 2147483647
 maximumTarget = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'

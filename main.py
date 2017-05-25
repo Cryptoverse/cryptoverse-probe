@@ -379,6 +379,11 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 
 def sync(params=None):
 	silent = putil.retrieve(params, '-s', True, False)
+	if putil.retrieve(params, '-f', True, False):
+		if not silent:
+			print 'Removing all locally cached starlogs'
+		database.initialize(True)
+
 	latest = database.getStarLogLatest()
 	latestTime = 0 if latest is None else latest['time']
 	allResults = []
@@ -1012,6 +1017,14 @@ def main():
 		'info': createCommand(
 			info, 
 			'Displays information about the connected server'
+		),
+		'sync': createCommand(
+			sync,
+			'Syncs the local cache with updates from the server',
+			[
+				'"-f" replaces the local cache with fresh results',
+				'"-s" silently executes the command'
+			]
 		),
 		'slog': createCommand(
 			starLog, 

@@ -211,6 +211,7 @@ def probe(params=None):
 	fromQuery = putil.retrieveValue(params, '-f', None)
 	loop = putil.retrieve(params, '-l', True, False)
 	wait = float(putil.retrieveValue(params, '-w', 0.0))
+	blind = putil.retrieve(params, '-b', True, False)
 	if wait < 0:
 		raise CommandException('Cannot use a wait less than zero seconds')
 	fromHash = None
@@ -218,14 +219,16 @@ def probe(params=None):
 		fromHash = putil.naturalMatch(fromQuery, database.getStarLogHashes())
 		if fromHash is None:
 			raise CommandException('Unable to find a system hash containing %s' % fromQuery)
-	sync('-s')
+	if not blind:
+		sync('-s')
 	generated = None
 	started = datetime.now()
 	while generated is None:
 		try:
 			generated = generateNextStarLog(fromHash, fromGenesis, allowDuplicateEvents, started)
 		except ProbeTimeoutException:
-			sync('-s')
+			if not blind:
+				sync('-s')
 	if not silent:
 		print 'Probed new starlog %s' % util.getSystemName(generated['hash'])
 		if verbose:
@@ -243,7 +246,8 @@ def probe(params=None):
 		printException()
 		print 'Something went wrong when trying to post the generated starlog'
 	if loop:
-		sleep(wait)
+		if 0 < wait:
+			sleep(wait)
 		probe(params)
 
 def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvents=False, startTime=None, timeout=180):
@@ -396,7 +400,10 @@ def sync(params=None):
 	offset = 0
 	while util.maximumStarLogSize() == lastCount:
 		results = getRequest(starLogsUrl, { 'since_time': latestTime, 'limit': util.maximumStarLogSize(), 'offset': offset })
-		lastCount = len(results)
+		if results is None:
+			lastCount = 0
+		else:
+			lastCount = len(results)
 		offset += lastCount
 		allResults += results
 
@@ -1047,7 +1054,8 @@ def main():
 				'"-d" allow duplicate events',
 				'"-f" probes for a starlog ontop of the best matching system',
 				'"-l" loop and probe again after posting to the server',
-				'"-w" number of seconds to wait before looping to probe again'
+				'"-w" number of seconds to wait before looping to probe again',
+				'"-b" blindly probe for new stars without syncing inbetween'
 			]
 		),
 		'account': createCommand(

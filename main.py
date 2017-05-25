@@ -3,6 +3,7 @@ from os import getenv, environ
 from sys import stdout, platform
 from traceback import print_exc as printException
 from datetime import datetime
+from time import sleep
 from ete3 import Tree
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -209,6 +210,9 @@ def probe(params=None):
 	allowDuplicateEvents = putil.retrieve(params, '-d', True, False)
 	fromQuery = putil.retrieveValue(params, '-f', None)
 	loop = putil.retrieve(params, '-l', True, False)
+	wait = float(putil.retrieveValue(params, '-w', 0.0))
+	if wait < 0:
+		raise CommandException('Cannot use a wait less than zero seconds')
 	fromHash = None
 	if fromQuery is not None:
 		fromHash = putil.naturalMatch(fromQuery, database.getStarLogHashes())
@@ -239,6 +243,7 @@ def probe(params=None):
 		printException()
 		print 'Something went wrong when trying to post the generated starlog'
 	if loop:
+		sleep(wait)
 		probe(params)
 
 def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvents=False, startTime=None, timeout=180):
@@ -1041,7 +1046,8 @@ def main():
 				'"-a" aborts without posting starlog to the server',
 				'"-d" allow duplicate events',
 				'"-f" probes for a starlog ontop of the best matching system',
-				'"-l" loop and probe again after posting to the server'
+				'"-l" loop and probe again after posting to the server',
+				'"-w" number of seconds to wait before looping to probe again'
 			]
 		),
 		'account': createCommand(

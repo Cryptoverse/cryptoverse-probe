@@ -1153,7 +1153,7 @@ def main():
 					command = command[:-1]
 				else:
 					# We're in the middle of a string
-					command = command[:commandIndex] + command[commandIndex + 1:]
+					command = command[:commandIndex - 1] + command[commandIndex:]
 				commandIndex -= 1
 		elif isControlC:
 			break

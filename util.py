@@ -50,12 +50,12 @@ SHIP_EVENT_TYPES = [
     'attack'
 ]
 
-if not 0 <= difficultyFudge() <= 8:
-    raise Exception('DIFFICULTY_FUDGE must be a value from 0 to 8 (inclusive)')
-elif 0 < difficultyFudge():
-    prefix = MAXIMUM_TARGET[difficultyFudge():]
-    suffix = MAXIMUM_TARGET[:difficultyFudge()]
-    MAXIMUM_TARGET = prefix + suffix
+def get_maximum_target():
+    if difficultyFudge() == 0:
+        return MAXIMUM_TARGET
+    if not 0 <= difficultyFudge() <= 8:
+        raise Exception('DIFFICULTY_FUDGE must be a value from 0 to 8 (inclusive)')
+    return MAXIMUM_TARGET[difficultyFudge():] + MAXIMUM_TARGET[:difficultyFudge()]
 
 if not 3 <= cartesianDigits() <= 21:
     raise Exception('CARTESIAN_DIGITS must be a value from 3 to 21 (inclusive)')
@@ -183,7 +183,7 @@ def calculate_difficulty(difficulty, duration):
     elif duration > difficultyDuration() * 4:
         duration = difficultyDuration() * 4
 
-    limit = long(MAXIMUM_TARGET, 16)
+    limit = long(get_maximum_target(), 16)
     result = long(unpack_bits(difficulty), 16)
     result *= duration
     result /= difficultyDuration()

@@ -342,10 +342,11 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	nextStarLog['log_header'] = util.concat_star_log_header(nextStarLog)
 	nextStarLog['height'] = 0 if isGenesis else nextStarLog['height'] + 1
 
-	previousRecalculation = None
 	if not isGenesis and util.is_difficulty_changing(nextStarLog['height']):
+		# We have to recalculate the difficulty at this height.
 		previousRecalculation = database.getStarLogAtHight(nextStarLog['previous_hash'], nextStarLog['height'] - util.difficultyInterval())
-		nextStarLog['difficulty'] = util.calculate_difficulty(previousRecalculation['difficulty'], nextStarLog['time'] - previousRecalculation['time'])
+		previousStarLog = database.getStarLog(nextStarLog['previous_hash'])
+		nextStarLog['difficulty'] = util.calculate_difficulty(previousRecalculation['difficulty'], previousStarLog['time'] - previousRecalculation['time'])
 
 	found = False
 	tries = 0
@@ -382,10 +383,6 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 		if util.MAXIMUM_NONCE <= currentNonce:
 			currentNonce = 0
 			nextStarLog['time'] = util.get_time()
-			if previousRecalculation is not None:
-				nextStarLog['difficulty'] = util.calculate_difficulty(previousRecalculation['difficulty'], nextStarLog['time'] - previousRecalculation['time'])
-				currentDifficulty = util.unpack_bits(nextStarLog['difficulty'], True)
-				currentDifficultyLeadingZeros = len(currentDifficulty) - len(currentDifficulty.lstrip('0'))
 			logPrefix = util.concat_star_log_header(nextStarLog, False)
 		tries += 1
 	if found:

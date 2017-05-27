@@ -252,7 +252,7 @@ def getStarLogHashes(systemHash=None, fromHighest=False):
 		if systemHash:
 			lastHash = systemHash if fromHighest else getStarLogHighest(systemHash)['hash']
 			results = []
-			while not util.isGenesisStarLog(lastHash):
+			while not util.is_genesis_star_log(lastHash):
 				results.append(lastHash)
 				lastHash = getStarLog(lastHash)['previous_hash']
 			return results
@@ -285,7 +285,7 @@ def getStarLogsShareChain(systemHashes):
 	if None in [highest, lowest]:
 		return False
 	previousHash = highest['previous_hash']
-	while not util.isGenesisStarLog(previousHash):
+	while not util.is_genesis_star_log(previousHash):
 		if previousHash == lowest['hash']:
 			return True
 		currentSystem = getStarLog(previousHash)
@@ -299,15 +299,15 @@ def getUnusedEvents(fromStarLog=None, systemHash=None, fleetHash=None):
 		fromStarLog = getStarLogHighest(systemHash)['hash']
 	usedEvents = []
 	results = []
-	while not util.isGenesisStarLog(fromStarLog):
+	while not util.is_genesis_star_log(fromStarLog):
 		system = getStarLog(fromStarLog)
 		for event in system['events']:
-			if event['type'] not in util.shipEventTypes:
+			if event['type'] not in util.SHIP_EVENT_TYPES:
 				continue
 			for eventInput in event['inputs']:
 				usedEvents.append(eventInput['key'])
 			for eventOutput in event['outputs']:
-				if eventOutput['type'] in util.shipEventTypes and eventOutput['key'] not in usedEvents:
+				if eventOutput['type'] in util.SHIP_EVENT_TYPES and eventOutput['key'] not in usedEvents:
 					if systemHash is not None:
 						if eventOutput['star_system'] is None:
 							if fromStarLog != systemHash:
@@ -325,7 +325,7 @@ def getUnusedEvents(fromStarLog=None, systemHash=None, fleetHash=None):
 def anyEventsExist(events, fromStarLog=None):
 	if fromStarLog is None:
 		fromStarLog = getStarLogHighest()['hash']
-	while not util.isGenesisStarLog(fromStarLog):
+	while not util.is_genesis_star_log(fromStarLog):
 		system = getStarLog(fromStarLog)
 		for event in system['events']:
 			for eventEntry in event['inputs'] + event['outputs']:
@@ -337,7 +337,7 @@ def anyEventsExist(events, fromStarLog=None):
 def anyEventsUsed(events, fromStarLog=None):
 	if fromStarLog is None:
 		fromStarLog = getStarLogHighest()['hash']
-	while not util.isGenesisStarLog(fromStarLog):
+	while not util.is_genesis_star_log(fromStarLog):
 		system = getStarLog(fromStarLog)
 		for event in system['events']:
 			for eventEntry in event['inputs']:
@@ -350,7 +350,7 @@ def getFleets(fromStarLog=None):
 	if fromStarLog is None:
 		fromStarLog = getStarLogHighest()['hash']
 	results = []
-	while not util.isGenesisStarLog(fromStarLog):
+	while not util.is_genesis_star_log(fromStarLog):
 		system = getStarLog(fromStarLog)
 		for event in system['events']:
 			for eventOutput in event['outputs']:

@@ -43,12 +43,12 @@ def getGenesis():
 	return {
 		'nonce': 0,
 		'height': 0,
-		'hash': util.emptyTarget,
+		'hash': util.EMPTY_TARGET,
 		'difficulty': util.difficultyStart(),
 		'events': [],
 		'version': 0,
 		'time': 0,
-		'previous_hash': util.emptyTarget,
+		'previous_hash': util.EMPTY_TARGET,
 		'events_hash': None
 	}
 
@@ -157,7 +157,7 @@ def account(params=None):
 		result = database.getAccount()
 		if result:
 			print 'Using account "%s"' % result['name']
-			print '\tFleet Hash: %s' % util.getFleetHashName(result['public_key'])
+			print '\tFleet Hash: %s' % util.get_fleet_hash_name(result['public_key'])
 		else:
 			print 'No active account'
 
@@ -169,7 +169,7 @@ def accountAll():
 		entryMessage = '\n%s\t- %s\n\t\tFleet Hash: %s'
 		for currentAccount in accounts:
 			activeFlag = '[CURR] ' if currentAccount['active'] else ''
-			message += entryMessage % (activeFlag, currentAccount['name'], util.getFleetHashName(currentAccount['public_key']))
+			message += entryMessage % (activeFlag, currentAccount['name'], util.get_fleet_hash_name(currentAccount['public_key']))
 	print message
 
 def accountSet(name):
@@ -230,7 +230,7 @@ def probe(params=None):
 			if not blind:
 				sync('-s')
 	if not silent:
-		print 'Probed new starlog %s' % util.getSystemName(generated['hash'])
+		print 'Probed new starlog %s' % util.get_system_name(generated['hash'])
 		if verbose:
 			print prettyJson(generated)
 	if not post:
@@ -258,7 +258,7 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 		localHighest = database.getStarLogHighest()
 		if localHighest is not None:
 			nextStarLog = localHighest
-	isGenesis = util.isGenesisStarLog(nextStarLog['hash'])
+	isGenesis = util.is_genesis_star_log(nextStarLog['hash'])
 	accountInfo = database.getAccount()
 	nextStarLog['events'] = []
 
@@ -306,7 +306,7 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 		'index': 0,
 		'type': 'reward',
 		'fleet_hash': util.sha256(accountInfo['public_key']),
-		'key': util.sha256('%s%s' % (util.getTime(), accountInfo['public_key'])),
+		'key': util.sha256('%s%s' % (util.get_time(), accountInfo['public_key'])),
 		'star_system': None,
 		'count': util.shipReward(),
 	}
@@ -331,21 +331,21 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 		# Until we have a way to select where to send your reward ships, just send them to the genesis block.
 		rewardOutput['star_system'] = firstStarLog[0]['hash']
 
-	rewardEvent['hash'] = util.hashEvent(rewardEvent)
-	rewardEvent['signature'] = util.rsaSign(accountInfo['private_key'], rewardEvent['hash'])
+	rewardEvent['hash'] = util.hash_event(rewardEvent)
+	rewardEvent['signature'] = util.rsa_sign(accountInfo['private_key'], rewardEvent['hash'])
 
 	nextStarLog['events'].append(rewardEvent)
 	nextStarLog['previous_hash'] = nextStarLog['hash']
-	nextStarLog['time'] = util.getTime()
+	nextStarLog['time'] = util.get_time()
 	nextStarLog['nonce'] = 0
-	nextStarLog['events_hash'] = util.hashEvents(nextStarLog['events'])
-	nextStarLog['log_header'] = util.concatStarLogHeader(nextStarLog)
+	nextStarLog['events_hash'] = util.hash_events(nextStarLog['events'])
+	nextStarLog['log_header'] = util.concat_star_log_header(nextStarLog)
 	nextStarLog['height'] = 0 if isGenesis else nextStarLog['height'] + 1
 
 	previousRecalculation = None
-	if not isGenesis and util.isDifficultyChanging(nextStarLog['height']):
+	if not isGenesis and util.is_difficulty_changing(nextStarLog['height']):
 		previousRecalculation = database.getStarLogAtHight(nextStarLog['previous_hash'], nextStarLog['height'] - util.difficultyInterval())
-		nextStarLog['difficulty'] = util.calculateDifficulty(previousRecalculation['difficulty'], nextStarLog['time'] - previousRecalculation['time'])
+		nextStarLog['difficulty'] = util.calculate_difficulty(previousRecalculation['difficulty'], nextStarLog['time'] - previousRecalculation['time'])
 
 	found = False
 	tries = 0
@@ -355,11 +355,11 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	started = currStarted if startTime is None else startTime
 	lastCheckin = currStarted
 	# This initial hash hangles the hashing of events and such.
-	nextStarLog = util.hashStarLog(nextStarLog)
-	currentDifficulty = util.unpackBits(nextStarLog['difficulty'], True)
+	nextStarLog = util.hash_star_log(nextStarLog)
+	currentDifficulty = util.unpack_bits(nextStarLog['difficulty'], True)
 	currentDifficultyLeadingZeros = len(currentDifficulty) - len(currentDifficulty.lstrip('0'))
 	currentNonce = 0
-	logPrefix = util.concatStarLogHeader(nextStarLog, False)
+	logPrefix = util.concat_star_log_header(nextStarLog, False)
 	currentHash = None
 
 	while not found:
@@ -379,18 +379,18 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 			elapsedMinutes = (now - started).total_seconds() / 60
 			print '\tProbing at %.0f hashes per second, %.1f minutes elapsed...' % (hashesPerSecond, elapsedMinutes)
 		currentNonce += 1
-		if util.maximumNonce <= currentNonce:
+		if util.MAXIMUM_NONCE <= currentNonce:
 			currentNonce = 0
-			nextStarLog['time'] = util.getTime()
+			nextStarLog['time'] = util.get_time()
 			if previousRecalculation is not None:
-				nextStarLog['difficulty'] = util.calculateDifficulty(previousRecalculation['difficulty'], nextStarLog['time'] - previousRecalculation['time'])
-				currentDifficulty = util.unpackBits(nextStarLog['difficulty'], True)
+				nextStarLog['difficulty'] = util.calculate_difficulty(previousRecalculation['difficulty'], nextStarLog['time'] - previousRecalculation['time'])
+				currentDifficulty = util.unpack_bits(nextStarLog['difficulty'], True)
 				currentDifficultyLeadingZeros = len(currentDifficulty) - len(currentDifficulty.lstrip('0'))
-			logPrefix = util.concatStarLogHeader(nextStarLog, False)
+			logPrefix = util.concat_star_log_header(nextStarLog, False)
 		tries += 1
 	if found:
 		nextStarLog['nonce'] = currentNonce
-		nextStarLog['log_header'] = util.concatStarLogHeader(nextStarLog)
+		nextStarLog['log_header'] = util.concat_star_log_header(nextStarLog)
 		nextStarLog['hash'] = currentHash
 	else:
 		raise CommandException('Unable to probe a new starlog')
@@ -465,11 +465,11 @@ def renderChain(params=None):
 		stratum = strata[i]
 		if i == 0:
 			for orphan in stratum[1]:
-				lastNode.add_child(name=util.getSystemName(orphan['hash']))
+				lastNode.add_child(name=util.get_system_name(orphan['hash']))
 		else:
 			lastNode = lastNode.add_child()
 			for orphan in stratum[1]:
-				lastNode.add_sister(name=util.getSystemName(orphan['hash']))
+				lastNode.add_sister(name=util.get_system_name(orphan['hash']))
 		
 	print tree
 
@@ -478,12 +478,12 @@ def renderSystems(params=None):
 	axes = figure.add_subplot(111, projection='3d')
 
 	for currentSystem in database.getStarLogHashes(fromHighest=True):
-		currentPosition = util.getCartesian(currentSystem)
+		currentPosition = util.get_cartesian(currentSystem)
 		xs = [ currentPosition[0], currentPosition[0] ]
 		ys = [ currentPosition[1], currentPosition[1] ]
 		zs = [ 0, currentPosition[2] ]
 		axes.plot(xs, ys, zs)
-		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=util.getSystemName(currentSystem))
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=util.get_system_name(currentSystem))
 	
 	axes.legend()
 	axes.set_title('Systems')
@@ -523,13 +523,13 @@ def listDeployments(params=None):
 			fleets[fleet] += count
 		else:
 			fleets[fleet] = count
-	result = 'No deployments in system %s' % util.getSystemName(selectedHash)
+	result = 'No deployments in system %s' % util.get_system_name(selectedHash)
 	if fleets:
-		result = 'Deployments in star system %s' % util.getSystemName(selectedHash)
+		result = 'Deployments in star system %s' % util.get_system_name(selectedHash)
 		fleetKeys = fleets.keys()
 		for i in range(0, len(fleets)):
 			currentFleet = fleetKeys[i]
-			result += '\n - %s : %s' % (util.getFleetName(currentFleet), fleets[currentFleet])
+			result += '\n - %s : %s' % (util.get_fleet_name(currentFleet), fleets[currentFleet])
 		
 	print result
 
@@ -561,13 +561,13 @@ def listAllDeployments(fromStarLog, verbose):
 		systemKeys = systems.keys()
 		for i in range(0, len(systemKeys)):
 			currentSystem = systemKeys[i]
-			result += '\n - %s' % util.getSystemName(currentSystem)
+			result += '\n - %s' % util.get_system_name(currentSystem)
 			fleetKeys = systems[currentSystem].keys()
 			for f in range(0, len(fleetKeys)):
 				currentFleet = fleetKeys[f]
 				fleetCount = systems[currentSystem][currentFleet]
 				activeFlag = '[CURR] ' if currentFleet == accountHash else ''
-				result += '\n%s\t - %s : %s' % (activeFlag, util.getFleetName(currentFleet), fleetCount)
+				result += '\n%s\t - %s : %s' % (activeFlag, util.get_fleet_name(currentFleet), fleetCount)
 		
 	print result
 	
@@ -587,7 +587,7 @@ def attack(params=None):
 		raise CommandException('Unable to find a fleet containing %s' % enemyFragment)
 	enemyDeployments = database.getUnusedEvents(highestHash, originHash, enemyHash)
 	if enemyDeployments is None:
-		raise CommandException('Fleet %s has no ships deployed in %s' % (util.getFleetName(enemyHash), util.getSystemName(originHash)))
+		raise CommandException('Fleet %s has no ships deployed in %s' % (util.get_fleet_name(enemyHash), util.get_system_name(originHash)))
 	accountInfo = database.getAccount()
 	friendlyHash = util.sha256(accountInfo['public_key'])
 	friendlyDeployments = database.getUnusedEvents(highestHash, originHash, friendlyHash)
@@ -595,7 +595,7 @@ def attack(params=None):
 	for friendlyDeployment in friendlyDeployments:
 		friendlyCount += friendlyDeployment['count']
 	if friendlyCount == 0:
-		raise CommandException('None of your fleet is deployed to %s' % util.getSystemName(originHash))
+		raise CommandException('None of your fleet is deployed to %s' % util.get_system_name(originHash))
 	
 	# TODO: Break this out into its own get call.
 	attackEvent = {
@@ -624,12 +624,12 @@ def attack(params=None):
 		if enemyCount <= friendlyCount:
 			break
 	if enemyCount < friendlyCount:
-		attackEvent['outputs'].append(getEventOutput(0, friendlyCount - enemyCount, friendlyHash, util.getUniqueKey(), originHash, 'attack'))
+		attackEvent['outputs'].append(getEventOutput(0, friendlyCount - enemyCount, friendlyHash, util.get_unique_key(), originHash, 'attack'))
 	elif friendlyCount < enemyCount:
-		attackEvent['outputs'].append(getEventOutput(0, enemyCount - friendlyCount, enemyHash, util.getUniqueKey(), originHash, 'attack'))
+		attackEvent['outputs'].append(getEventOutput(0, enemyCount - friendlyCount, enemyHash, util.get_unique_key(), originHash, 'attack'))
 	
-	attackEvent['hash'] = util.hashEvent(attackEvent)
-	attackEvent['signature'] = util.rsaSign(accountInfo['private_key'], attackEvent['hash'])
+	attackEvent['hash'] = util.hash_event(attackEvent)
+	attackEvent['signature'] = util.rsa_sign(accountInfo['private_key'], attackEvent['hash'])
 
 	if verbose:
 		print prettyJson(attackEvent)
@@ -665,7 +665,7 @@ def jump(params=None):
 	if destinationHash is None:
 		raise CommandException('Unable to find a destination system containing %s' % destinationFragment)
 	if not database.getStarLogsShareChain([originHash, destinationHash]):
-		raise CommandException('Systems %s and %s exist on different chains' % (util.getSystemName(originHash), util.getSystemName(destinationHash)))
+		raise CommandException('Systems %s and %s exist on different chains' % (util.get_system_name(originHash), util.get_system_name(destinationHash)))
 	highestHash = database.getStarLogHighest(database.getStarLogHighestFromList([originHash, destinationHash]))['hash']
 	accountInfo = database.getAccount()
 	fleetHash = util.sha256(accountInfo['public_key'])
@@ -681,7 +681,7 @@ def jump(params=None):
 	if count <= 0:
 		raise CommandException('A number of ships greater than zero must be specified for a jump')
 	# TODO: Insert support for non-lossy jumps here.
-	jumpCost = util.getJumpCost(destinationHash, originHash, count)
+	jumpCost = util.get_jump_cost(destinationHash, originHash, count)
 	if jumpCost == count:
 		raise CommandException('Unable to complete a jump where all ships would be lost')
 
@@ -708,16 +708,16 @@ def jump(params=None):
 	extraShips = totalInputCount - count
 	outputs = []
 	index = 0
-	jumpKey = util.sha256('%s%s%s%s' % (util.getTime(), fleetHash, originHash, destinationHash))
+	jumpKey = util.sha256('%s%s%s%s' % (util.get_time(), fleetHash, originHash, destinationHash))
 	if 0 < extraShips:
-		outputs.append(getEventOutput(index, extraShips, fleetHash, util.getUniqueKey(), originHash, 'jump'))
+		outputs.append(getEventOutput(index, extraShips, fleetHash, util.get_unique_key(), originHash, 'jump'))
 		index += 1
 	outputs.append(getEventOutput(index, count - jumpCost, fleetHash, jumpKey, destinationHash, 'jump'))
 
 	jumpEvent['inputs'] = inputs
 	jumpEvent['outputs'] = outputs
-	jumpEvent['hash'] = util.hashEvent(jumpEvent)
-	jumpEvent['signature'] = util.rsaSign(accountInfo['private_key'], jumpEvent['hash'])
+	jumpEvent['hash'] = util.hash_event(jumpEvent)
+	jumpEvent['signature'] = util.rsa_sign(accountInfo['private_key'], jumpEvent['hash'])
 
 	if verbose:
 		print prettyJson(jumpEvent)
@@ -735,21 +735,21 @@ def renderJump(originHash, destinationHash):
 	axes = figure.add_subplot(111, projection='3d')
 
 	for currentSystem in database.getStarLogHashes(highest):
-		currentPosition = util.getCartesian(currentSystem)
+		currentPosition = util.get_cartesian(currentSystem)
 		xs = [ currentPosition[0], currentPosition[0] ]
 		ys = [ currentPosition[1], currentPosition[1] ]
 		zs = [ 0, currentPosition[2] ]
 		axes.plot(xs, ys, zs)
-		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=util.getSystemName(currentSystem))
-	originPosition = util.getCartesian(originHash)
-	destinationPosition = util.getCartesian(destinationHash)
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=util.get_system_name(currentSystem))
+	originPosition = util.get_cartesian(originHash)
+	destinationPosition = util.get_cartesian(destinationHash)
 	xs = [ originPosition[0], destinationPosition[0] ]
 	ys = [ originPosition[1], destinationPosition[1] ]
 	zs = [ originPosition[2], destinationPosition[2] ]
 	axes.plot(xs, ys, zs, linestyle=':')
 	
 	axes.legend()
-	axes.set_title('Jump %s -> %s' % (util.getSystemName(originHash), util.getSystemName(destinationHash)))
+	axes.set_title('Jump %s -> %s' % (util.get_system_name(originHash), util.get_system_name(destinationHash)))
 	axes.set_xlabel('X')
 	axes.set_ylabel('Y')
 	axes.set_zlabel('Z')
@@ -773,7 +773,7 @@ def renderJumpRange(params=None):
 		if destinationHash is None:
 			raise CommandException('Unable to find a destination system containing %s' % destinationFragment)
 		if not database.getStarLogsShareChain([originHash, destinationHash]):
-			raise CommandException('Systems %s and %s exist on different chains' % (util.getSystemName(originHash), util.getSystemName(destinationHash)))
+			raise CommandException('Systems %s and %s exist on different chains' % (util.get_system_name(originHash), util.get_system_name(destinationHash)))
 		highest = database.getStarLogHighest(database.getStarLogHighestFromList([originHash, destinationHash]))['hash']
 	
 	figure = pyplot.figure()
@@ -782,27 +782,27 @@ def renderJumpRange(params=None):
 	hueEnd = 0.0
 	hueDelta = hueEnd - hueStart
 	for currentSystem in database.getStarLogHashes(highest):
-		cost = util.getJumpCost(originHash, currentSystem)
+		cost = util.get_jump_cost(originHash, currentSystem)
 		costHue = hueStart + (cost * hueDelta)
 		costValue = 0.0 if cost == 1.0 else 1.0
 		color = pycolors.hsv_to_rgb([costHue, 0.7, costValue])
-		currentPosition = util.getCartesian(currentSystem)
+		currentPosition = util.get_cartesian(currentSystem)
 		xs = [ currentPosition[0], currentPosition[0] ]
 		ys = [ currentPosition[1], currentPosition[1] ]
 		zs = [ 0, currentPosition[2] ]
 		axes.plot(xs, ys, zs, c=color)
 		marker = '^' if currentSystem == originHash else 'o'
-		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=util.getSystemName(currentSystem), c=color, marker=marker)
+		axes.scatter(currentPosition[0], currentPosition[1], currentPosition[2], label=util.get_system_name(currentSystem), c=color, marker=marker)
 	if destinationHash is not None:
-		originPosition = util.getCartesian(originHash)
-		destinationPosition = util.getCartesian(destinationHash)
+		originPosition = util.get_cartesian(originHash)
+		destinationPosition = util.get_cartesian(destinationHash)
 		xs = [ originPosition[0], destinationPosition[0] ]
 		ys = [ originPosition[1], destinationPosition[1] ]
 		zs = [ originPosition[2], destinationPosition[2] ]
 		axes.plot(xs, ys, zs, linestyle=':')
 	
 	axes.legend()
-	axes.set_title('Jump Range %s' % util.getSystemName(originHash))
+	axes.set_title('Jump Range %s' % util.get_system_name(originHash))
 	axes.set_xlabel('X')
 	axes.set_ylabel('Y')
 	axes.set_zlabel('Z')
@@ -816,7 +816,7 @@ def systemPosition(params=None):
 	originHash = putil.naturalMatch(originFragment, database.getStarLogHashes())
 	if originHash is None:
 		raise CommandException('Unable to find an origin system containing %s' % originFragment)
-	print '%s system is at %s' % (util.getSystemName(originHash), util.getCartesian(originHash))
+	print '%s system is at %s' % (util.get_system_name(originHash), util.get_cartesian(originHash))
 
 def systemDistance(params=None):
 	if not putil.hasCount(params, 2):
@@ -831,8 +831,8 @@ def systemDistance(params=None):
 	if destinationHash is None:
 		raise CommandException('Unable to find a destination system containing %s' % destinationFragment)
 	if not database.getStarLogsShareChain([originHash, destinationHash]):
-		raise CommandException('Systems %s and %s exist on different chains' % (util.getSystemName(originHash), util.getSystemName(destinationHash)))
-	print 'Distance between %s and %s is %s' % (util.getSystemName(originHash), util.getSystemName(destinationHash), util.getDistance(originHash, destinationHash))
+		raise CommandException('Systems %s and %s exist on different chains' % (util.get_system_name(originHash), util.get_system_name(destinationHash)))
+	print 'Distance between %s and %s is %s' % (util.get_system_name(originHash), util.get_system_name(destinationHash), util.get_distance(originHash, destinationHash))
 
 def systemAverageDistances(params=None):
 	originHash = None
@@ -847,14 +847,14 @@ def systemAverageDistances(params=None):
 		for currentHash in database.getStarLogHashes(originHash):
 			if currentHash == originHash:
 				continue
-			total += util.getDistance(currentHash, originHash)
+			total += util.get_distance(currentHash, originHash)
 			count += 1
 	else:
 		hashes = database.getStarLogHashes(fromHighest=True)
 		for currentHash in hashes:
 			hashes = hashes[1:]
 			for targetHash in hashes:
-				total += util.getDistance(currentHash, targetHash)
+				total += util.get_distance(currentHash, targetHash)
 				count += 1
 	if count == 0:
 		print 'No systems to get the average distances of'
@@ -863,7 +863,7 @@ def systemAverageDistances(params=None):
 		if originHash is None:
 			print 'Average distance between all systems is %s' % average
 		else:
-			print 'Average distance to system %s is %s' % (util.getSystemName(originHash), average)
+			print 'Average distance to system %s is %s' % (util.get_system_name(originHash), average)
 
 def systemMaximumDistance(params=None):
 	systemMinMaxDistance(params)
@@ -885,11 +885,11 @@ def systemMinMaxDistance(params=None, calculatingMax=True):
 		for currentHash in database.getStarLogHashes(originHash):
 			if currentHash == originHash:
 				continue
-			dist = util.getDistance(originHash, currentHash)
+			dist = util.get_distance(originHash, currentHash)
 			if (calculatingMax and bestDistance < dist) or (not calculatingMax and dist < bestDistance):
 				bestSystem = currentHash
 				bestDistance = dist
-		print '%s system from %s is %s, with a distance of %s' % (modifier, util.getSystemName(originHash), util.getSystemName(bestSystem), bestDistance)
+		print '%s system from %s is %s, with a distance of %s' % (modifier, util.get_system_name(originHash), util.get_system_name(bestSystem), bestDistance)
 	else:
 		hashes = database.getStarLogHashes(fromHighest=True)
 		bestSystemOrigin = None
@@ -898,12 +898,12 @@ def systemMinMaxDistance(params=None, calculatingMax=True):
 		for currentHash in hashes:
 			hashes = hashes[1:]
 			for targetHash in hashes:
-				dist = util.getDistance(currentHash, targetHash)
+				dist = util.get_system_name(currentHash, targetHash)
 				if (calculatingMax and bestDistance < dist) or (not calculatingMax and dist < bestDistance):
 					bestSystemOrigin = currentHash
 					bestSystemDestination = targetHash
 					bestDistance = dist
-		print '%s systems are %s and %s, with a distance of %s' % (modifier, util.getSystemName(bestSystemOrigin), util.getSystemName(bestSystemDestination), bestDistance)
+		print '%s systems are %s and %s, with a distance of %s' % (modifier, util.get_system_name(bestSystemOrigin), util.get_system_name(bestSystemDestination), bestDistance)
 
 def pollInput():
 	if platform.startswith('win'):
@@ -1016,8 +1016,8 @@ def main():
 	environ['COMMAND_HISTORY'] = getenv('COMMAND_HISTORY', '100')
 
 	print 'Connected to %s\n\t - Fudge: %s\n\t - Interval: %s\n\t - Duration: %s\n\t - Starting Difficulty: %s\n\t - Ship Reward: %s' % (hostUrl, util.difficultyFudge(), util.difficultyInterval(), util.difficultyDuration(), util.difficultyStart(), util.shipReward())
-	minX, minY, minZ = util.getCartesianMinimum()
-	maxX, maxY, maxZ = util.getCartesianMaximum()
+	minX, minY, minZ = util.get_cartesian_minimum()
+	maxX, maxY, maxZ = util.get_cartesian_maximum()
 	universeSize = '( %s, %s, %s ) - ( %s, %s, %s )' % (minX, minY, minZ, maxX, maxY, maxZ)
 	print '\t - Universe Size: %s\n\t - Jump Cost: %s%% to %s%%\n\t - Jump Distance Max: %s' % (universeSize, util.jumpCostMinimum() * 100, util.jumpCostMaximum() * 100, util.jumpDistanceMaximum())
 	if autoRebuild:
@@ -1258,7 +1258,7 @@ def main():
 		except:
 			printException()
 			print 'Error with your last command'
-		database.addCommand(command, util.getTime(), commandInSession)
+		database.addCommand(command, util.get_time(), commandInSession)
 		command = None
 		commandIndex = 0
 		commandHistory = -1

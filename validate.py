@@ -70,7 +70,7 @@ def starLog(starLogJson):
 		raise Exception('nonce is not an integer')
 	if not isinstance(starLogJson['time'], int):
 		raise Exception('time is not an integer')
-	if util.getTime() < starLogJson['time']:
+	if util.get_time() < starLogJson['time']:
 		raise Exception('time is greater than the current time')
 	if not isinstance(starLogJson['events_hash'], basestring):
 		raise Exception('events_hash is not a string')
@@ -80,8 +80,8 @@ def starLog(starLogJson):
 	fieldIsSha256(starLogJson['hash'], 'hash')
 	fieldIsSha256(starLogJson['previous_hash'], 'previous_hash')
 	fieldIsSha256(starLogJson['events_hash'], 'events_hash')
-	sha256(starLogJson['hash'], util.concatStarLogHeader(starLogJson), 'log_header')
-	if not starLogJson['events_hash'] == util.hashEvents(starLogJson['events']):
+	sha256(starLogJson['hash'], util.concat_star_log_header(starLogJson), 'log_header')
+	if not starLogJson['events_hash'] == util.hash_events(starLogJson['events']):
 		raise Exception('events_hash does not match actual hash')
 	difficulty(starLogJson['difficulty'], starLogJson['hash'])
 	events(starLogJson['events'])
@@ -189,12 +189,12 @@ def event(eventJson, requireIndex=True, requireStarSystem=False, rewardAllowed=T
 			raise Exception('duplicate output index %s' % outputIndex)
 		outputIndices.append(outputIndex)
 
-	if util.hashEvent(eventJson) != eventJson['hash']:
+	if util.hash_event(eventJson) != eventJson['hash']:
 		raise Exception('provided hash does not match the calculated one')
 
 	fieldIsSha256(eventJson['fleet_hash'], 'fleet_hash')
 	sha256(eventJson['fleet_hash'], eventJson['fleet_key'], 'fleet_key')
-	rsa(util.expandRsaPublicKey(eventJson['fleet_key']), eventJson['signature'], eventJson['hash'])
+	rsa(util.expand_rsa_public_key(eventJson['fleet_key']), eventJson['signature'], eventJson['hash'])
 
 def eventInput(inputJson):
 	if not isinstance(inputJson['index'], int):
@@ -240,7 +240,7 @@ def eventRsa(eventJson):
 		eventJson (dict): Event to validate.
 	'''
 	try:
-		rsa(util.expandRsaPublicKey(eventJson['fleet_key']), eventJson['signature'], util.concatEvent(eventJson))
+		rsa(util.expand_rsa_public_key(eventJson['fleet_key']), eventJson['signature'], util.concat_event(eventJson))
 	except InvalidSignature:
 		raise Exception('Invalid RSA signature')
 
@@ -256,7 +256,7 @@ def difficulty(packed, sha, validateParams=True):
 			raise Exception('difficulty is not an int')
 		fieldIsSha256(sha, 'difficulty target')
 	
-	mask = util.unpackBits(packed, True)
+	mask = util.unpack_bits(packed, True)
 	leadingZeros = len(mask) - len(mask.lstrip('0'))
 	difficultyUnpacked(mask, leadingZeros, sha, validateParams)
 

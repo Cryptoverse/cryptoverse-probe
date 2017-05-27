@@ -211,6 +211,27 @@ def getStarLog(systemHash):
 	finally:
 		connection.close()
 
+def getStarLogAtHight(systemHash, height):
+	connection, cursor = begin()
+	try:
+		dbResult = cursor.execute('SELECT height, hash, previous_hash, json FROM star_logs WHERE hash=?', (systemHash,)).fetchone()
+		if dbResult is None:
+			return None
+		relativeHeight = dbResult[0]
+		if relativeHeight == height:
+			return json.loads(dbResult[3])
+		decreasing = height < relativeHeight
+		while dbResult is not None and dbResult[0] != height:
+			if decreasing:
+				if dbResult[0] == 0:
+					return None
+				dbResult = cursor.execute('SELECT height, hash, previous_hash, json FROM star_logs WHERE hash=?', (dbResult[2],)).fetchone()
+			else:
+				dbResult = cursor.execute('SELECT height, hash, previous_hash, json FROM star_logs WHERE previous_hash=?', (dbResult[1],)).fetchone()
+		return None if dbResult is None else json.loads(dbResult[3])
+	finally:
+		connection.close()
+
 def getStarLogsAtHight(height, limit):
 	connection, cursor = begin()
 	try:

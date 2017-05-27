@@ -341,6 +341,12 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 	nextStarLog['events_hash'] = util.hashEvents(nextStarLog['events'])
 	nextStarLog['log_header'] = util.concatStarLogHeader(nextStarLog)
 	nextStarLog['height'] = 0 if isGenesis else nextStarLog['height'] + 1
+
+	previousRecalculation = None
+	if not isGenesis and util.isDifficultyChanging(nextStarLog['height']):
+		previousRecalculation = database.getStarLogAtHight(nextStarLog['previous_hash'], nextStarLog['height'] - util.difficultyInterval())
+		nextStarLog['difficulty'] = util.calculateDifficulty(previousRecalculation['difficulty'], nextStarLog['time'] - previousRecalculation['time'])
+
 	found = False
 	tries = 0
 	checkInterval = 10000000
@@ -376,6 +382,10 @@ def generateNextStarLog(fromStarLog=None, fromGenesis=False, allowDuplicateEvent
 		if util.maximumNonce <= currentNonce:
 			currentNonce = 0
 			nextStarLog['time'] = util.getTime()
+			if previousRecalculation is not None:
+				nextStarLog['difficulty'] = util.calculateDifficulty(previousRecalculation['difficulty'], nextStarLog['time'] - previousRecalculation['time'])
+				currentDifficulty = util.unpackBits(nextStarLog['difficulty'], True)
+				currentDifficultyLeadingZeros = len(currentDifficulty) - len(currentDifficulty.lstrip('0'))
 			logPrefix = util.concatStarLogHeader(nextStarLog, False)
 		tries += 1
 	if found:

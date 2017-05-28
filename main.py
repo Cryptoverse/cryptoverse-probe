@@ -667,12 +667,12 @@ def jump(params=None):
     count = None
     if not putil.has_any(params):
         raise CommandException('Specify an origin and destination system')
-        if len(params) < 2:
-            raise CommandException('An origin and destination system must be specified')
+    if len(params) < 2:
+        raise CommandException('An origin and destination system must be specified')
     origin_fragment = params[0]
     destination_fragment = params[1]
-        if 2 < len(params) and isinstance(params[2], int):
-            count = int(params[2])
+    if 2 < len(params) and isinstance(params[2], int):
+        count = int(params[2])
     hashes = database.get_star_log_hashes()
     origin_hash = putil.natural_match(origin_fragment, hashes)
     if origin_hash is None:

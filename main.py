@@ -289,7 +289,7 @@ def generate_next_star_log(from_star_log=None, from_genesis=False, allow_duplica
             used_outputs = []
             events = []
             for event in event_results:
-                validate.event(event, requireIndex=False, requireStarSystem=True, rewardAllowed=False)
+                validate.event(event, require_index=False, require_star_system=True, reward_allowed=False)
                 conflict = False
                 current_used_inputs = []
                 for current_input in event['inputs']:

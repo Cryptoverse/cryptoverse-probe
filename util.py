@@ -267,7 +267,7 @@ def hash_star_log(star_log):
         star_log (dict): Json data for the star log to be hashed.
     
     Returns:
-        str: Supplied star log with its `events_hash`, `log_header`, and `hash` fields calculated.
+        dict: Supplied star log with its `events_hash`, `log_header`, and `hash` fields calculated.
     """
     star_log['events_hash'] = hash_events(star_log['events'])
     star_log['log_header'] = concat_star_log_header(star_log)
@@ -473,7 +473,7 @@ def get_cartesian(system_hash):
         system_hash (str): The system's Sha256 hash.
     
     Returns:
-        array: A list containing the (x, y, z) position.
+        numpy.array: A list containing the (x, y, z) position.
     """
     cartesian_hash = sha256('%s%s' % ('cartesian', system_hash))
     digits = cartesianDigits()

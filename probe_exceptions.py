@@ -1,5 +1,6 @@
 class CommandException(Exception):
-	pass
+    pass
+
 
 class ProbeTimeoutException(Exception):
-	pass
+    pass

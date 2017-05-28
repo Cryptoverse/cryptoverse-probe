@@ -7,279 +7,292 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
 import util
 
-def byteSize(limit, target):
-	if limit < len(target):
-		raise Exception('Length is not less than %s bytes' % limit)
 
-def fieldIsSha256(sha, fieldName=None):
-	'''Verifies a string is a possible Sha256 hash.
+def byte_size(limit, target):
+    if limit < len(target):
+        raise Exception('Length is not less than %s bytes' % limit)
 
-	Args:
-		sha (str): Hash to verify.
-	'''
-	if not re.match(r'^[A-Fa-f0-9]{64}$', sha):
-		raise Exception('Field is not a hash' if fieldName is None else 'Field %s is not a hash' % fieldName)
 
-def rsa(publicKey, signature, message):
-	'''Verifies an Rsa signature.
-	Args:
-		publicKey (str): Public key with BEGIN and END sections.
-		signature (str): Hex value of the signature with its leading 0x stripped.
-		message (str): Message that was signed, unhashed.
-	'''
-	try:
-		publicRsa = load_pem_public_key(bytes(publicKey), backend=default_backend())
-		hashed = util.sha256(message)
-		publicRsa.verify(
-			binascii.unhexlify(signature),
-			hashed,
-			padding.PSS(
-				mgf=padding.MGF1(hashes.SHA256()),
-				salt_length=padding.PSS.MAX_LENGTH
-			),
-			hashes.SHA256()
-		)
-	except InvalidSignature:
-		raise Exception('Invalid signature')
+def field_is_sha256(sha, field_name=None):
+    """Verifies a string is a possible Sha256 hash.
+
+    Args:
+        sha (str): Hash to verify.
+    """
+    if not re.match(r'^[A-Fa-f0-9]{64}$', sha):
+        raise Exception('Field is not a hash' if field_name is None else 'Field %s is not a hash' % field_name)
+
+
+def rsa(public_key, signature, message):
+    """Verifies an Rsa signature.
+    Args:
+        public_key (str): Public key with BEGIN and END sections.
+        signature (str): Hex value of the signature with its leading 0x stripped.
+        message (str): Message that was signed, unhashed.
+    """
+    try:
+        public_rsa = load_pem_public_key(bytes(public_key), backend=default_backend())
+        hashed = util.sha256(message)
+        public_rsa.verify(
+            binascii.unhexlify(signature),
+            hashed,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+    except InvalidSignature:
+        raise Exception('Invalid signature')
+
 
 def sha256(sha, message, name=None):
-	'''Verifies the hash matches the Sha256'd message.
+    """Verifies the hash matches the Sha256'd message.
 
-	Args:
-		sha (str): A Sha256 hash result.
-		message (str): Message to hash and compare to.
-	'''
-	if not sha == util.sha256(message):
-		raise Exception('Sha256 does not match message' if name is None else 'Sha256 of %s does not match hash' % name)
+    Args:
+        sha (str): A Sha256 hash result.
+        message (str): Message to hash and compare to.
+    """
+    if not sha == util.sha256(message):
+        raise Exception('Sha256 does not match message' if name is None else 'Sha256 of %s does not match hash' % name)
 
-def starLog(starLogJson):
-	'''Verifies the starlog has all the required fields, and any hashes and signatures match up.
 
-	Args:
-		starLogJson (dict): Target starlog json.
-	'''
-	if not isinstance(starLogJson['hash'], basestring):
-		raise Exception('hash is not a string')
-	if not isinstance(starLogJson['version'], int):
-		raise Exception('version is not an integer')
-	if not isinstance(starLogJson['previous_hash'], basestring):
-		raise Exception('previous_hash is not a string')
-	if not isinstance(starLogJson['difficulty'], int):
-		raise Exception('difficulty is not an integer')
-	if not isinstance(starLogJson['nonce'], int):
-		raise Exception('nonce is not an integer')
-	if not isinstance(starLogJson['time'], int):
-		raise Exception('time is not an integer')
-	if util.get_time() < starLogJson['time']:
-		raise Exception('time is greater than the current time')
-	if not isinstance(starLogJson['events_hash'], basestring):
-		raise Exception('events_hash is not a string')
-	if starLogJson['events'] is None:
-		raise Exception('events is missing')
-	
-	fieldIsSha256(starLogJson['hash'], 'hash')
-	fieldIsSha256(starLogJson['previous_hash'], 'previous_hash')
-	fieldIsSha256(starLogJson['events_hash'], 'events_hash')
-	sha256(starLogJson['hash'], util.concat_star_log_header(starLogJson), 'log_header')
-	if not starLogJson['events_hash'] == util.hash_events(starLogJson['events']):
-		raise Exception('events_hash does not match actual hash')
-	difficulty(starLogJson['difficulty'], starLogJson['hash'])
-	events(starLogJson['events'])
+def star_log(star_log_json):
+    """Verifies the starlog has all the required fields, and any hashes and signatures match up.
 
-def events(eventsJson):
-	'''Verifies the state of a star log has all the required fields, and any hashes and signatures match up.
+    Args:
+        star_log_json (dict): Target starlog json.
+    """
+    if not isinstance(star_log_json['hash'], basestring):
+        raise Exception('hash is not a string')
+    if not isinstance(star_log_json['version'], int):
+        raise Exception('version is not an integer')
+    if not isinstance(star_log_json['previous_hash'], basestring):
+        raise Exception('previous_hash is not a string')
+    if not isinstance(star_log_json['difficulty'], int):
+        raise Exception('difficulty is not an integer')
+    if not isinstance(star_log_json['nonce'], int):
+        raise Exception('nonce is not an integer')
+    if not isinstance(star_log_json['time'], int):
+        raise Exception('time is not an integer')
+    if util.get_time() < star_log_json['time']:
+        raise Exception('time is greater than the current time')
+    if not isinstance(star_log_json['events_hash'], basestring):
+        raise Exception('events_hash is not a string')
+    if star_log_json['events'] is None:
+        raise Exception('events is missing')
+    
+    field_is_sha256(star_log_json['hash'], 'hash')
+    field_is_sha256(star_log_json['previous_hash'], 'previous_hash')
+    field_is_sha256(star_log_json['events_hash'], 'events_hash')
+    sha256(star_log_json['hash'], util.concat_star_log_header(star_log_json), 'log_header')
+    if not star_log_json['events_hash'] == util.hash_events(star_log_json['events']):
+        raise Exception('events_hash does not match actual hash')
+    difficulty(star_log_json['difficulty'], star_log_json['hash'])
+    events(star_log_json['events'])
 
-	Args:
-		stateJson (dict): State json.
-	'''
-	remainingShipRewards = util.shipReward()
-	inputKeys = []
-	outputKeys = []
-	for currentEvent in eventsJson:
-		event(currentEvent)
-		if currentEvent['type'] == 'reward':
-			if len(currentEvent['inputs']) != 0:
-				raise Exception('reward events cannot have inputs')
-			if len(currentEvent['outputs']) == 0:
-				raise Exception('reward events with no recipients should not be included')
-			for currentOutput in currentEvent['outputs']:
-				remainingShipRewards -= currentOutput['count']
-				if remainingShipRewards < 0:
-					raise Exception('number of ships rewarded is out of range')
-				if currentOutput['type'] != 'reward':
-					raise Exception('reward outputs must be of type "reward"')
-		elif currentEvent['type'] == 'jump':
-			if len(currentEvent['inputs']) == 0:
-				raise Exception('jump events cannot have zero inputs')
-			outputLength = len(currentEvent['outputs'])
-			if outputLength == 0:
-				raise Exception('jump events cannot have zero outputs')
-			if 2 < outputLength:
-				raise Exception('jump events cannot have more than 2 outputs')
-			if 2 == outputLength and currentEvent['outputs'][0]['star_system'] == currentEvent['outputs'][1]['star_system']:
-				raise Exception('jump event cannot split in new system')
-			for currentOutput in currentEvent['outputs']:
-				if currentOutput['count'] <= 0:
-					raise Exception('jump events cannot jump zero or less ships')
-				if currentOutput['type'] != 'jump':
-					raise Exception('jump outputs must be of type "jump"')
-		elif currentEvent['type'] == 'attack':
-			if len(currentEvent['inputs']) < 2:
-				raise Exception('attack events need at least two inputs')
-			if len(currentEvent['inputs']) < len(currentEvent['outputs']):
-				raise Exception('attacks cannot have more outputs than inputs')
-			for currentOutput in currentEvent['outputs']:
-				if currentOutput['count'] <= 0:
-					raise Exception('attack events cannot outputs zero or less ships')
-				if currentOutput['attack'] != 'attack':
-					raise Exception('attack outputs must be of type "attack"')
-		else:
-			raise ValueError('unrecognized event of type %s' % currentEvent['type'])
-		
-		for currentInput in currentEvent['inputs']:
-			key = currentInput['key']
-			if key in inputKeys:
-				raise Exception('event input key %s is listed more than once' % key)
-			inputKeys.append(key)
-		for currentOutput in currentEvent['outputs']:
-			key = currentOutput['key']
-			if key in outputKeys:
-				raise Exception('event output key %s is listed more than once' % key)
-			outputKeys.append(key)
 
-def event(eventJson, requireIndex=True, requireStarSystem=False, rewardAllowed=True):
-	'''Verifies the fields of an event.
+def events(events_json):
+    """Verifies the state of a star log has all the required fields, and any hashes and signatures match up.
 
-	Args:
-		eventJson (dict): Target.
-		requireIndex (bool): Verifies an integer index is included if True.
-		requireStarSystem (bool): Verifies that every output specifies a star system if True.
-	'''
-	if not isinstance(eventJson['type'], basestring):
-		raise Exception('type is not a string')
-	if not isinstance(eventJson['fleet_hash'], basestring):
-		raise Exception('fleet_hash is not a string')
-	if not isinstance(eventJson['fleet_key'], basestring):
-		raise Exception('fleet_key is not a string')
-	if not isinstance(eventJson['hash'], basestring):
-		raise Exception('hash is not a string')
-	if requireIndex and not isinstance(eventJson['index'], int):
-		raise Exception('index is not an integer')
-	
-	fieldIsSha256(eventJson['hash'], 'hash')
+    Args:
+        events_json (dict): Events json.
+    """
+    remaining_ship_rewards = util.shipReward()
+    input_keys = []
+    output_keys = []
+    for current_event in events_json:
+        event(current_event)
+        if current_event['type'] == 'reward':
+            if len(current_event['inputs']) != 0:
+                raise Exception('reward events cannot have inputs')
+            if len(current_event['outputs']) == 0:
+                raise Exception('reward events with no recipients should not be included')
+            for current_output in current_event['outputs']:
+                remaining_ship_rewards -= current_output['count']
+                if remaining_ship_rewards < 0:
+                    raise Exception('number of ships rewarded is out of range')
+                if current_output['type'] != 'reward':
+                    raise Exception('reward outputs must be of type "reward"')
+        elif current_event['type'] == 'jump':
+            if len(current_event['inputs']) == 0:
+                raise Exception('jump events cannot have zero inputs')
+            output_length = len(current_event['outputs'])
+            if output_length == 0:
+                raise Exception('jump events cannot have zero outputs')
+            if 2 < output_length:
+                raise Exception('jump events cannot have more than 2 outputs')
+            if 2 == output_length and current_event['outputs'][0]['star_system'] == current_event['outputs'][1]['star_system']:
+                raise Exception('jump event cannot split in new system')
+            for current_output in current_event['outputs']:
+                if current_output['count'] <= 0:
+                    raise Exception('jump events cannot jump zero or less ships')
+                if current_output['type'] != 'jump':
+                    raise Exception('jump outputs must be of type "jump"')
+        elif current_event['type'] == 'attack':
+            if len(current_event['inputs']) < 2:
+                raise Exception('attack events need at least two inputs')
+            if len(current_event['inputs']) < len(current_event['outputs']):
+                raise Exception('attacks cannot have more outputs than inputs')
+            for current_output in current_event['outputs']:
+                if current_output['count'] <= 0:
+                    raise Exception('attack events cannot outputs zero or less ships')
+                if current_output['attack'] != 'attack':
+                    raise Exception('attack outputs must be of type "attack"')
+        else:
+            raise ValueError('unrecognized event of type %s' % current_event['type'])
+        
+        for current_input in current_event['inputs']:
+            key = current_input['key']
+            if key in input_keys:
+                raise Exception('event input key %s is listed more than once' % key)
+            input_keys.append(key)
+        for current_output in current_event['outputs']:
+            key = current_output['key']
+            if key in output_keys:
+                raise Exception('event output key %s is listed more than once' % key)
+            output_keys.append(key)
 
-	if not rewardAllowed and eventJson['type'] == 'reward':
-		raise Exception('event of type %s forbidden' % eventJson['type'])
-	if eventJson['type'] not in ['reward', 'jump', 'attack']:
-		raise Exception('unrecognized event of type %s' % eventJson['type'])
 
-	inputIndices = []
-	for currentInput in eventJson['inputs']:
-		eventInput(currentInput)
-		inputIndex = currentInput['index']
-		if inputIndex in inputIndices:
-			raise Exception('duplicate input index %s' % inputIndex)
-		inputIndices.append(inputIndex)
-	
-	outputIndices = []
-	for currentOutput in eventJson['outputs']:
-		eventOutput(currentOutput, requireStarSystem)
-		outputIndex = currentOutput['index']
-		if outputIndex in outputIndices:
-			raise Exception('duplicate output index %s' % outputIndex)
-		outputIndices.append(outputIndex)
+def event(event_json, require_index=True, require_star_system=False, reward_allowed=True):
+    """Verifies the fields of an event.
 
-	if util.hash_event(eventJson) != eventJson['hash']:
-		raise Exception('provided hash does not match the calculated one')
+    Args:
+        event_json (dict): Target.
+        require_index (bool): Verifies an integer index is included if True.
+        require_star_system (bool): Verifies that every output specifies a star system if True.
+    """
+    if not isinstance(event_json['type'], basestring):
+        raise Exception('type is not a string')
+    if not isinstance(event_json['fleet_hash'], basestring):
+        raise Exception('fleet_hash is not a string')
+    if not isinstance(event_json['fleet_key'], basestring):
+        raise Exception('fleet_key is not a string')
+    if not isinstance(event_json['hash'], basestring):
+        raise Exception('hash is not a string')
+    if require_index and not isinstance(event_json['index'], int):
+        raise Exception('index is not an integer')
+    
+    field_is_sha256(event_json['hash'], 'hash')
 
-	fieldIsSha256(eventJson['fleet_hash'], 'fleet_hash')
-	sha256(eventJson['fleet_hash'], eventJson['fleet_key'], 'fleet_key')
-	rsa(util.expand_rsa_public_key(eventJson['fleet_key']), eventJson['signature'], eventJson['hash'])
+    if not reward_allowed and event_json['type'] == 'reward':
+        raise Exception('event of type %s forbidden' % event_json['type'])
+    if event_json['type'] not in ['reward', 'jump', 'attack']:
+        raise Exception('unrecognized event of type %s' % event_json['type'])
 
-def eventInput(inputJson):
-	if not isinstance(inputJson['index'], int):
-		raise Exception('index is not an integer')
-	if not isinstance(inputJson['key'], basestring):
-		raise Exception('key is not a string')
-	
-	if inputJson['index'] < 0:
-		raise Exception('index is out of range')
+    input_indices = []
+    for currentInput in event_json['inputs']:
+        event_input(currentInput)
+        input_index = currentInput['index']
+        if input_index in input_indices:
+            raise Exception('duplicate input index %s' % input_index)
+        input_indices.append(input_index)
+    
+    output_indices = []
+    for currentOutput in event_json['outputs']:
+        event_output(currentOutput, require_star_system)
+        output_index = currentOutput['index']
+        if output_index in output_indices:
+            raise Exception('duplicate output index %s' % output_index)
+        output_indices.append(output_index)
 
-	fieldIsSha256(inputJson['key'], 'key')
+    if util.hash_event(event_json) != event_json['hash']:
+        raise Exception('provided hash does not match the calculated one')
 
-def eventOutput(outputJson, requireStarSystem=False):
-	if not isinstance(outputJson['index'], int):
-		raise Exception('index is not an integer')
-	if not isinstance(outputJson['type'], basestring):
-		raise Exception('type is not a string')
-	if not isinstance(outputJson['fleet_hash'], basestring):
-		raise Exception('fleet_hash is not a string')
-	if not isinstance(outputJson['key'], basestring):
-		raise Exception('key is not a string')
-	if outputJson['star_system'] is None and requireStarSystem:
-		raise Exception('star_system is missing')
-	if outputJson['star_system'] is not None:
-		if not isinstance(outputJson['star_system'], basestring):
-			raise Exception('star_system is not a string')
-		fieldIsSha256(outputJson['star_system'], 'star_system')
-	if not isinstance(outputJson['count'], int):
-		raise Exception('count is not an integer')
-	
-	if outputJson['index'] < 0:
-		raise Exception('index is out of range')
-	if outputJson['count'] <= 0:
-		raise Exception('count is out of range')
+    field_is_sha256(event_json['fleet_hash'], 'fleet_hash')
+    sha256(event_json['fleet_hash'], event_json['fleet_key'], 'fleet_key')
+    rsa(util.expand_rsa_public_key(event_json['fleet_key']), event_json['signature'], event_json['hash'])
 
-	fieldIsSha256(outputJson['fleet_hash'], 'fleet_hash')
-	fieldIsSha256(outputJson['key'], 'key')
-	
-def eventRsa(eventJson):
-	'''Verifies the Rsa signature of the provided event json.
 
-	Args:
-		eventJson (dict): Event to validate.
-	'''
-	try:
-		rsa(util.expand_rsa_public_key(eventJson['fleet_key']), eventJson['signature'], util.concat_event(eventJson))
-	except InvalidSignature:
-		raise Exception('Invalid RSA signature')
+def event_input(input_json):
+    if not isinstance(input_json['index'], int):
+        raise Exception('index is not an integer')
+    if not isinstance(input_json['key'], basestring):
+        raise Exception('key is not a string')
+    
+    if input_json['index'] < 0:
+        raise Exception('index is out of range')
 
-def difficulty(packed, sha, validateParams=True):
-	'''Takes the integer form of difficulty and verifies that the hash is less than it.
+    field_is_sha256(input_json['key'], 'key')
 
-	Args:
-		packed (int): Packed target difficulty the provided Sha256 hash must meet.
-		sha (str): Hex target to test, stripped of its leading 0x.
-	'''
-	if validateParams:
-		if not isinstance(packed, (int, long)):
-			raise Exception('difficulty is not an int')
-		fieldIsSha256(sha, 'difficulty target')
-	
-	mask = util.unpack_bits(packed, True)
-	leadingZeros = len(mask) - len(mask.lstrip('0'))
-	difficultyUnpacked(mask, leadingZeros, sha, validateParams)
 
-def difficultyUnpacked(unpackedStripped, leadingZeros, sha, validateParams=True):
-	'''Takes the unpacked form of difficulty and verifies that the hash is less than it.
+def event_output(output_json, require_star_system=False):
+    if not isinstance(output_json['index'], int):
+        raise Exception('index is not an integer')
+    if not isinstance(output_json['type'], basestring):
+        raise Exception('type is not a string')
+    if not isinstance(output_json['fleet_hash'], basestring):
+        raise Exception('fleet_hash is not a string')
+    if not isinstance(output_json['key'], basestring):
+        raise Exception('key is not a string')
+    if output_json['star_system'] is None and require_star_system:
+        raise Exception('star_system is missing')
+    if output_json['star_system'] is not None:
+        if not isinstance(output_json['star_system'], basestring):
+            raise Exception('star_system is not a string')
+        field_is_sha256(output_json['star_system'], 'star_system')
+    if not isinstance(output_json['count'], int):
+        raise Exception('count is not an integer')
+    
+    if output_json['index'] < 0:
+        raise Exception('index is out of range')
+    if output_json['count'] <= 0:
+        raise Exception('count is out of range')
 
-	Args:
-		unpacked (str): Unpacked target difficulty the provided Sha256 hash must meet.
-		sha (str): Hex target to test, stripped of its leading 0x.
-	'''
-	if validateParams:
-		fieldIsSha256(sha, 'difficulty target')
-	
-	try:
-		for i in range(0, leadingZeros):
-			if sha[i] != '0':
-				raise Exception('Hash is greater than packed target')
-		significant = sha[:len(unpackedStripped)]
-		if int(unpackedStripped, 16) <= int(significant, 16):
-			raise Exception('Hash is greater than packed target')
-	except:
-		raise Exception('Unable to cast to int from hexidecimal')
+    field_is_sha256(output_json['fleet_hash'], 'fleet_hash')
+    field_is_sha256(output_json['key'], 'key')
 
-def lostCount(count, lostCount, originHash, destinationHash):
-	# TODO: check the lost count is correct
-	pass
+
+def event_rsa(event_json):
+    """Verifies the Rsa signature of the provided event json.
+
+    Args:
+        event_json (dict): Event to validate.
+    """
+    try:
+        rsa(util.expand_rsa_public_key(event_json['fleet_key']), event_json['signature'], util.concat_event(event_json))
+    except InvalidSignature:
+        raise Exception('Invalid RSA signature')
+
+
+def difficulty(packed, sha, validate_params=True):
+    """Takes the integer form of difficulty and verifies that the hash is less than it.
+
+    Args:
+        packed (int): Packed target difficulty the provided Sha256 hash must meet.
+        sha (str): Hex target to test, stripped of its leading 0x.
+    """
+    if validate_params:
+        if not isinstance(packed, (int, long)):
+            raise Exception('difficulty is not an int')
+        field_is_sha256(sha, 'difficulty target')
+    
+    mask = util.unpack_bits(packed, True)
+    leading_zeros = len(mask) - len(mask.lstrip('0'))
+    difficulty_unpacked(mask, leading_zeros, sha, validate_params)
+
+
+def difficulty_unpacked(unpacked_stripped, leading_zeros, sha, validate_params=True):
+    """Takes the unpacked form of difficulty and verifies that the hash is less than it.
+
+    Args:
+        unpacked_stripped (str): Unpacked target difficulty the provided Sha256 hash must meet.
+        sha (str): Hex target to test, stripped of its leading 0x.
+    """
+    if validate_params:
+        field_is_sha256(sha, 'difficulty target')
+    
+    try:
+        for i in range(0, leading_zeros):
+            if sha[i] != '0':
+                raise Exception('Hash is greater than packed target')
+        significant = sha[:len(unpacked_stripped)]
+        if int(unpacked_stripped, 16) <= int(significant, 16):
+            raise Exception('Hash is greater than packed target')
+    except:
+        raise Exception('Unable to cast to int from hexidecimal')
+
+
+def lost_count(count, lost_count, origin_hash, destination_hash):
+    # TODO: check the lost count is correct
+    pass

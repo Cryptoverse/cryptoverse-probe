@@ -280,7 +280,7 @@ def generate_next_star_log(from_star_log=None, from_genesis=False, allow_duplica
     next_star_log['events'] = []
 
     if not is_genesis:
-        event_results = get_request(EVENTS_URL, {'limit': util.maximumEventSize()})
+        event_results = get_request(EVENTS_URL, {'limit': util.eventsMaxLimit()})
         if event_results:
             unused_events = []
             for unusedEvent in database.get_unused_events(from_star_log=next_star_log['hash']):

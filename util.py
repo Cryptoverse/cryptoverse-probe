@@ -32,6 +32,12 @@ def jumpCostMaximum():
     return float(os.getenv('JUMP_COST_MAX', '1.0'))
 def jumpDistanceMaximum():
     return float(os.getenv('JUMP_DIST_MAX', '2048.0'))
+def starLogsMaxLimit():
+    return int(os.getenv('STARLOGS_MAX_LIMIT', '10'))
+def eventsMaxLimit():
+    return int(os.getenv('EVENTS_MAX_LIMIT', '10'))
+def chainsMaxLimit():
+    return int(os.getenv('CHAINS_MAX_LIMIT', '10'))
 
 MAXIMUM_NONCE = 2147483647
 MAXIMUM_TARGET = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'

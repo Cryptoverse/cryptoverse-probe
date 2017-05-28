@@ -403,10 +403,10 @@ def sync(params=None):
 	latest = database.getStarLogLatest()
 	latestTime = 0 if latest is None else latest['time']
 	allResults = []
-	lastCount = util.maximumStarLogSize()
+	lastCount = util.starLogsMaxLimit()
 	offset = 0
-	while util.maximumStarLogSize() == lastCount:
-		results = getRequest(starLogsUrl, { 'since_time': latestTime, 'limit': util.maximumStarLogSize(), 'offset': offset })
+	while util.starLogsMaxLimit() == lastCount:
+		results = getRequest(starLogsUrl, { 'since_time': latestTime, 'limit': util.starLogsMaxLimit(), 'offset': offset })
 		if results is None:
 			lastCount = 0
 		else:

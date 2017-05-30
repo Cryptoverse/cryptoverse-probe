@@ -331,21 +331,21 @@ def get_unused_events(from_star_log=None, system_hash=None, fleet_hash=None):
         for event in system['events']:
             if event['type'] not in util.SHIP_EVENT_TYPES:
                 continue
-            for eventInput in event['inputs']:
-                used_events.append(eventInput['key'])
-            for eventOutput in event['outputs']:
-                if eventOutput['type'] in util.SHIP_EVENT_TYPES and eventOutput['key'] not in used_events:
+            for event_input in event['inputs']:
+                used_events.append(event_input['key'])
+            for event_output in event['outputs']:
+                if event_output['type'] in util.SHIP_EVENT_TYPES and event_output['key'] not in used_events:
                     if system_hash is not None:
-                        if eventOutput['star_system'] is None:
+                        if event_output['star_system'] is None:
                             if from_star_log != system_hash:
                                 continue
-                        elif eventOutput['star_system'] != system_hash:
+                        elif event_output['star_system'] != system_hash:
                             continue
-                    if fleet_hash is not None and eventOutput['fleet_hash'] != fleet_hash:
+                    if fleet_hash is not None and event_output['fleet_hash'] != fleet_hash:
                         continue
-                    if eventOutput['star_system'] is None:
-                        eventOutput['star_system'] = system['hash']
-                    results.append(eventOutput)
+                    if event_output['star_system'] is None:
+                        event_output['star_system'] = system['hash']
+                    results.append(event_output)
         from_star_log = system['previous_hash']
     return results
 

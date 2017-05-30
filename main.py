@@ -323,7 +323,7 @@ def generate_next_star_log(from_star_log=None, from_genesis=False, allow_duplica
         'index': 0,
         'type': 'reward',
         'fleet_hash': util.sha256(account_info['public_key']),
-        'key': util.sha256('%s%s' % (util.get_time(), account_info['public_key'])),
+        'key': util.get_unique_key(),
         'star_system': None,
         'count': util.shipReward(),
     }

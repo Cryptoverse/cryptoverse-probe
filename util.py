@@ -47,13 +47,15 @@ EVENT_TYPES = [
     'unknown',
     'reward',
     'jump',
-    'attack'
+    'attack',
+    'transfer'
 ]
 
 SHIP_EVENT_TYPES = [
     'reward',
     'jump',
-    'attack'
+    'attack',
+    'transfer'
 ]
 
 def get_maximum_target():
@@ -568,13 +570,6 @@ def get_shortened_hash(sha, length=6, strip_zeros=True):
     else:
         return sha[:length]
 
-def get_hash_key():
-    """Gets the hash of a unique UUID, perfect for using as an event key.
-
-    Returns:
-        str: The Sha256 hash of a UUID.
-    """
-    return sha256(uuid.uuid4())
 
 def get_time():
     """UTC time in seconds.

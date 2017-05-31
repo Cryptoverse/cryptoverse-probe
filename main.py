@@ -53,6 +53,16 @@ def get_genesis():
         'events_hash': None
     }
 
+def get_event_signature(fleet_hash=None, fleet_key=None, event_hash=None, inputs=None, outputs=None, signature=None, event_type=None):
+    return {
+        'fleet_hash': fleet_hash,
+        'fleet_key': fleet_key,
+        'hash': event_hash,
+        'inputs': [] if inputs is None else inputs,
+        'outputs': [] if outputs is None else outputs,
+        'signature': signature,
+        'type': event_type
+    }
 
 def get_event_input(index, key):
     return {
@@ -701,16 +711,7 @@ def jump(params=None):
     if jump_cost == count:
         raise CommandException('Unable to complete a jump where all ships would be lost')
 
-    # TODO: Break this out into its own get call.
-    jump_event = {
-        'fleet_hash': fleet_hash,
-        'fleet_key': account_info['public_key'],
-        'hash': None,
-        'inputs': [],
-        'outputs': [],
-        'signature': None,
-        'type': 'jump'
-    }
+    jump_event = get_event_signature(fleet_hash, account_info['public_key'], event_type='jump')
 
     inputs = []
     input_index = 0
@@ -930,6 +931,71 @@ def system_min_max_distance(params=None, calculating_max=True):
         print '%s systems are %s and %s, with a distance of %s' % (modifier, util.get_system_name(best_system_origin), util.get_system_name(best_system_destination), best_distance)
 
 
+def transfer(params=None):
+    verbose = putil.retrieve(params, '-v', True, False)
+    abort = putil.retrieve(params, '-a', True, False)
+    if not putil.has_any(params):
+        raise CommandException('Another fleet hash must be specified')
+    to_fleet = putil.single_str(params)
+    try:
+        validate.field_is_sha256(to_fleet)
+    except:
+        raise CommandException('A complete fleet hash must be specified')
+    count = None
+    if putil.has_at_least(params, 2):
+        count = int(params[1])
+        if count <= 0:
+            raise CommandException('A valid number of ships must be specified')
+    account_info = database.get_account()
+    from_fleet = util.sha256(account_info['public_key'])
+    events = database.get_unused_events(fleet_hash=from_fleet)
+    if events is None:
+        raise CommandException('No ships are available to be transferred for fleet %s' % util.get_fleet_name(from_fleet))
+    total_count = 0
+    for event in events:
+        total_count += event['count']
+    if count is None:
+        count = total_count
+    elif total_count < count:
+        raise CommandException('Only %s are available to transfer' % total_count)
+    transfer_event = get_event_signature(from_fleet, account_info['public_key'], event_type='transfer')
+    remaining_count = count
+    overflow_count = 0
+    input_index = 0
+    output_index = 0
+    while 0 < remaining_count:
+        curr_input = events[input_index]
+        count_delta = curr_input['count']
+        if remaining_count < count_delta:
+            count_delta = count_delta - remaining_count
+        transfer_event['inputs'].append(get_event_input(input_index, curr_input['key']))
+        existing_output = [x for x in transfer_event['outputs'] if x['fleet_hash'] == to_fleet and x['star_system'] == curr_input['star_system']]
+        if existing_output:
+            # Add to existing output
+            existing_output = existing_output[0]
+            existing_output['count'] += count_delta
+        else:
+            transfer_event['outputs'].append(get_event_output(output_index, count_delta, to_fleet, util.get_unique_key(), curr_input['star_system'], 'transfer'))
+            output_index += 1
+        
+        if count_delta != curr_input['count']:
+            # Leftover ships that need to be assigned back to the owner.
+            input_index += 1
+            transfer_event['outputs'].append(get_event_output(input_index, curr_input['count'] - count_delta, from_fleet, util.get_unique_key(), curr_input['star_system'], 'transfer'))
+            remaining_count = 0
+        else:
+            remaining_count -= curr_input['count']
+        input_index += 1
+    transfer_event['hash'] = util.hash_event(transfer_event)
+    transfer_event['signature'] = util.rsa_sign(account_info['private_key'], transfer_event['hash'])
+    
+    if verbose:
+        print pretty_json(transfer_event)
+    if not abort:
+        result = post_request(EVENTS_URL, transfer_event)
+        prefix, postfix = SUCCESS_COLOR if result == 200 else ERROR_COLOR, DEFAULT_COLOR
+        print 'Posted transfer event with response %s%s%s' % (prefix, result, postfix)
+
 def poll_input():
     if platform.startswith('win'):
         return_sequence = [13]
@@ -1142,6 +1208,16 @@ def main():
                 '"-v" prints the jump to the console',
                 '"-r" renders the jump in an external plotter before executing it',
                 '"-a" aborts without posting jump to the server'
+            ]
+        ),
+        'transfer': create_command(
+            transfer,
+            'Transfer ships from one fleet to another',
+            [
+                'Passing a complete fleet hash will transfer all ships to that fleet',
+                'Passing a complete fleet hash and a valid number of ships will transfer that number of ships to that fleet',
+                '"-v" prints the transfer to the console',
+                '"-a" aborts without posting transfer to the server'
             ]
         ),
         'jrange': create_command(

@@ -14,7 +14,7 @@ def byte_size(limit, target):
 
 
 def field_is_sha256(sha, field_name=None):
-    """Verifies a string is a possible Sha256 hash.
+    """Verifies a string is a possible SHA256 hash.
 
     Args:
         sha (str): Hash to verify.
@@ -24,7 +24,7 @@ def field_is_sha256(sha, field_name=None):
 
 
 def rsa(public_key, signature, message):
-    """Verifies an Rsa signature.
+    """Verifies an RSA signature.
     Args:
         public_key (str): Public key with BEGIN and END sections.
         signature (str): Hex value of the signature with its leading 0x stripped.
@@ -47,14 +47,14 @@ def rsa(public_key, signature, message):
 
 
 def sha256(sha, message, name=None):
-    """Verifies the hash matches the Sha256'd message.
+    """Verifies the hash matches the SHA256'd message.
 
     Args:
-        sha (str): A Sha256 hash result.
+        sha (str): A SHA256 hash result.
         message (str): Message to hash and compare to.
     """
     if not sha == util.sha256(message):
-        raise Exception('Sha256 does not match message' if name is None else 'Sha256 of %s does not match hash' % name)
+        raise Exception('SHA256 does not match message' if name is None else 'SHA256 of %s does not match hash' % name)
 
 
 def star_log(star_log_json):
@@ -81,7 +81,7 @@ def star_log(star_log_json):
         raise Exception('events_hash is not a string')
     if star_log_json['events'] is None:
         raise Exception('events is missing')
-    
+
     field_is_sha256(star_log_json['hash'], 'hash')
     field_is_sha256(star_log_json['previous_hash'], 'previous_hash')
     field_is_sha256(star_log_json['events_hash'], 'events_hash')
@@ -137,11 +137,21 @@ def events(events_json):
             for current_output in current_event['outputs']:
                 if current_output['count'] <= 0:
                     raise Exception('attack events cannot outputs zero or less ships')
-                if current_output['attack'] != 'attack':
+                if current_output['type'] != 'attack':
                     raise Exception('attack outputs must be of type "attack"')
+        elif current_event['type'] == 'transfer':
+            if len(current_event['inputs']) < 1:
+                raise Exception('transfer events need at least one input')
+            if len(current_event['outputs']) < len(current_event['inputs']):
+                raise Exception('transfers cannot have more inputs than outputs')
+            for current_output in current_event['outputs']:
+                if current_output['count'] <= 0:
+                    raise Exception('transfer events cannot output zero or less ships')
+                if current_output['type'] != 'transfer':
+                    raise Exception('transfer outputs must be of type "transfer"')
         else:
             raise ValueError('unrecognized event of type %s' % current_event['type'])
-        
+
         for current_input in current_event['inputs']:
             key = current_input['key']
             if key in input_keys:
@@ -172,26 +182,26 @@ def event(event_json, require_index=True, require_star_system=False, reward_allo
         raise Exception('hash is not a string')
     if require_index and not isinstance(event_json['index'], int):
         raise Exception('index is not an integer')
-    
+
     field_is_sha256(event_json['hash'], 'hash')
 
     if not reward_allowed and event_json['type'] == 'reward':
         raise Exception('event of type %s forbidden' % event_json['type'])
-    if event_json['type'] not in ['reward', 'jump', 'attack']:
+    if event_json['type'] not in ['reward', 'jump', 'attack', 'transfer']:
         raise Exception('unrecognized event of type %s' % event_json['type'])
 
     input_indices = []
-    for currentInput in event_json['inputs']:
-        event_input(currentInput)
-        input_index = currentInput['index']
+    for current_input in event_json['inputs']:
+        event_input(current_input)
+        input_index = current_input['index']
         if input_index in input_indices:
             raise Exception('duplicate input index %s' % input_index)
         input_indices.append(input_index)
-    
+
     output_indices = []
-    for currentOutput in event_json['outputs']:
-        event_output(currentOutput, require_star_system)
-        output_index = currentOutput['index']
+    for current_output in event_json['outputs']:
+        event_output(current_output, require_star_system)
+        output_index = current_output['index']
         if output_index in output_indices:
             raise Exception('duplicate output index %s' % output_index)
         output_indices.append(output_index)
@@ -209,7 +219,7 @@ def event_input(input_json):
         raise Exception('index is not an integer')
     if not isinstance(input_json['key'], basestring):
         raise Exception('key is not a string')
-    
+
     if input_json['index'] < 0:
         raise Exception('index is out of range')
 
@@ -233,7 +243,7 @@ def event_output(output_json, require_star_system=False):
         field_is_sha256(output_json['star_system'], 'star_system')
     if not isinstance(output_json['count'], int):
         raise Exception('count is not an integer')
-    
+
     if output_json['index'] < 0:
         raise Exception('index is out of range')
     if output_json['count'] <= 0:
@@ -244,7 +254,7 @@ def event_output(output_json, require_star_system=False):
 
 
 def event_rsa(event_json):
-    """Verifies the Rsa signature of the provided event json.
+    """Verifies the RSA signature of the provided event json.
 
     Args:
         event_json (dict): Event to validate.
@@ -259,14 +269,14 @@ def difficulty(packed, sha, validate_params=True):
     """Takes the integer form of difficulty and verifies that the hash is less than it.
 
     Args:
-        packed (int): Packed target difficulty the provided Sha256 hash must meet.
+        packed (int): Packed target difficulty the provided SHA256 hash must meet.
         sha (str): Hex target to test, stripped of its leading 0x.
     """
     if validate_params:
         if not isinstance(packed, (int, long)):
             raise Exception('difficulty is not an int')
         field_is_sha256(sha, 'difficulty target')
-    
+
     mask = util.unpack_bits(packed, True)
     leading_zeros = len(mask) - len(mask.lstrip('0'))
     difficulty_unpacked(mask, leading_zeros, sha, validate_params)
@@ -276,12 +286,12 @@ def difficulty_unpacked(unpacked_stripped, leading_zeros, sha, validate_params=T
     """Takes the unpacked form of difficulty and verifies that the hash is less than it.
 
     Args:
-        unpacked_stripped (str): Unpacked target difficulty the provided Sha256 hash must meet.
+        unpacked_stripped (str): Unpacked target difficulty the provided SHA256 hash must meet.
         sha (str): Hex target to test, stripped of its leading 0x.
     """
     if validate_params:
         field_is_sha256(sha, 'difficulty target')
-    
+
     try:
         for i in range(0, leading_zeros):
             if sha[i] != '0':
@@ -291,8 +301,3 @@ def difficulty_unpacked(unpacked_stripped, leading_zeros, sha, validate_params=T
             raise Exception('Hash is greater than packed target')
     except:
         raise Exception('Unable to cast to int from hexidecimal')
-
-
-def lost_count(count, lost_count, origin_hash, destination_hash):
-    # TODO: check the lost count is correct
-    pass

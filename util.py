@@ -211,7 +211,7 @@ def concat_star_log_header(star_log, include_nonce=True):
     Returns:
         str: Resulting header.
     """
-    return '%s%s%s%s%s%s' % (star_log['version'], star_log['previous_hash'], star_log['difficulty'], star_log['events_hash'], star_log['time'], star_log['nonce'] if include_nonce else '')
+    return '%s%s%s%s%s%s%s' % (star_log['version'], star_log['previous_hash'], star_log['difficulty'], star_log['events_hash'], star_log['meta_hash'], star_log['time'], star_log['nonce'] if include_nonce else '')
 
 
 def concat_event(event_json):

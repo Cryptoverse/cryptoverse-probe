@@ -50,7 +50,9 @@ def get_genesis():
         'version': 0,
         'time': 0,
         'previous_hash': util.EMPTY_TARGET,
-        'events_hash': None
+        'events_hash': None,
+        'meta': None,
+        'meta_hash': None
     }
 
 def get_event_signature(fleet_hash=None, fleet_key=None, event_hash=None, inputs=None, outputs=None, signature=None, event_type=None):
@@ -361,6 +363,9 @@ def generate_next_star_log(from_star_log=None, from_genesis=False, allow_duplica
     reward_event['hash'] = util.hash_event(reward_event)
     reward_event['signature'] = util.rsa_sign(account_info['private_key'], reward_event['hash'])
 
+    meta = database.get_meta_content()
+    next_star_log['meta'] = '' if meta is None else meta
+    next_star_log['meta_hash'] = util.sha256(next_star_log['meta'])
     next_star_log['events'].append(reward_event)
     next_star_log['previous_hash'] = next_star_log['hash']
     next_star_log['time'] = util.get_time()
@@ -996,6 +1001,31 @@ def transfer(params=None):
         prefix, postfix = SUCCESS_COLOR if result == 200 else ERROR_COLOR, DEFAULT_COLOR
         print 'Posted transfer event with response %s%s%s' % (prefix, result, postfix)
 
+
+def meta_content(params=None):
+    if not putil.has_any(params):
+        current_content = database.get_meta_content()
+        if current_content is None:
+            print 'No meta content set, use meta -s <content> to set one'
+        else:
+            print 'Meta content is "%s"' % current_content
+        return
+    
+    if putil.retrieve(params, '-r', True, False):
+        database.set_meta_content(None)
+        print 'Meta content has been reset'
+        return
+    
+    new_content = putil.retrieve_value(params, '-s', None)
+    if putil.retrieve(params, '-s', True, False):
+        if new_content is None:
+            raise CommandException('Specify a new meta content, if you want to specify none use the -r flag instead')
+    else:
+        raise CommandException('An unrecognized parameter was passed')
+    database.set_meta_content(new_content)
+    print 'Meta content set to "%s"' % new_content
+
+
 def poll_input():
     if platform.startswith('win'):
         return_sequence = [13]
@@ -1157,6 +1187,15 @@ def main():
                 '"-l" loop and probe again after posting to the server',
                 '"-w" number of seconds to wait before looping to probe again',
                 '"-b" blindly probe for new stars without syncing inbetween'
+            ]
+        ),
+        'meta': create_command(
+            meta_content,
+            'Retrieves or sets the meta content included in probed starlogs',
+            [
+                'Passing no arguments retrieves the current meta content being included with probed starlogs',
+                '"-s" sets a new meta content',
+                '"-r" resets the meta content to nothing' 
             ]
         ),
         'account': create_command(

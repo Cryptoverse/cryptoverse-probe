@@ -36,6 +36,7 @@ def initialize(rebuild=False):
         cursor.execute('''CREATE TABLE IF NOT EXISTS star_logs (hash, previous_hash, height, time, json)''')
         cursor.execute('''CREATE TABLE IF NOT EXISTS accounts (active, name, private_key, public_key)''')
         cursor.execute('''CREATE TABLE IF NOT EXISTS command_history (command, time, session_order)''')
+        cursor.execute('''CREATE TABLE IF NOT EXISTS persistent (meta_content)''')
         connection.commit()
     finally:
         connection.close()
@@ -388,3 +389,27 @@ def get_fleets(from_star_log=None):
                     results.append(event_output['fleet_hash'])
         from_star_log = system['previous_hash']
     return results
+
+
+def set_meta_content(meta_content=None):
+    connection, cursor = begin()
+    try:
+        if not cursor.execute('SELECT * FROM persistent').fetchone():
+            cursor.execute('INSERT INTO persistent VALUES (?)', (meta_content,))
+            connection.commit()
+            return
+        cursor.execute('UPDATE persistent SET meta_content=?', (meta_content,))
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def get_meta_content():
+    connection, cursor = begin()
+    try:
+        entry = cursor.execute('SELECT * FROM persistent').fetchone()
+        if entry is None or entry[0] is None:
+            return None
+        return entry[0]
+    finally:
+        connection.close()

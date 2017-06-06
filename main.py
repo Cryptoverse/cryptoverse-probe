@@ -15,6 +15,7 @@ import database
 import util
 import validate
 import parameter_util as putil
+from blueprints import DEFAULT_HULL, DEFAULT_CARGO, DEFAULT_JUMP_DRIVE, DEFAULT_VESSEL
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -76,7 +77,8 @@ def get_event_input(index, key):
 def get_event_output(index, count, fleet_hash, key, star_system, type_name):
     return {
         'index': index,
-        'count': count,
+        'model': model,
+        'model_type': model_type,
         'fleet_hash': fleet_hash,
         'key': key,
         'star_system': star_system,
@@ -337,7 +339,8 @@ def generate_next_star_log(from_star_log=None, from_genesis=False, allow_duplica
         'fleet_hash': util.sha256(account_info['public_key']),
         'key': util.get_unique_key(),
         'star_system': None,
-        'count': util.shipReward(),
+        'model': DEFAULT_VESSEL,
+        'model_type': 'vessel',
     }
 
     reward_event = {

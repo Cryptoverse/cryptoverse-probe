@@ -82,6 +82,7 @@ EVENT_TYPES = [
 ]
 
 SHIP_EVENT_TYPES = [
+    'unknown',
     'reward',
     'jump',
     'attack',
@@ -89,10 +90,12 @@ SHIP_EVENT_TYPES = [
 ]
 
 RESOURCE_TYPES = [
+    'unknown',
     'fuel'
 ]
 
 MODULE_TYPES = [
+    'unknown',
     'hull',
     'jump_drive',
     'cargo'
@@ -496,6 +499,16 @@ def get_event_outputs(events_json):
     return results
 
 
+def get_array_index(array, name):
+    for i in range(0, len(array)):
+        if array[i] == name:
+            return i
+    return 0
+
+
+def get_array_name(array, index):
+    return array[index] if index is not None and index < len(array) else array[0]
+
 def get_event_type_id(event_name):
     """Gets the integer associated with the event type.
 
@@ -505,10 +518,7 @@ def get_event_type_id(event_name):
     Returns:
         int: Integer of the event type.
     """
-    for i in range(0, len(EVENT_TYPES)):
-        if EVENT_TYPES[i] == event_name:
-            return i
-    return 0
+    return get_array_index(EVENT_TYPES, event_name)
 
 
 def get_event_type_name(event_id):
@@ -520,7 +530,15 @@ def get_event_type_name(event_id):
     Returns:
         str: Str of the event type.
     """
-    return EVENT_TYPES[event_id] if event_id is not None and event_id < len(EVENT_TYPES) else EVENT_TYPES[0]
+    get_array_name(EVENT_TYPES, event_id)
+
+
+def get_module_type_id(module_name):
+    return get_array_index(MODULE_TYPES, module_name)
+
+
+def get_module_type_name(module_id):
+    return get_array_index(MODULE_TYPES, module_id)
 
 
 def get_jump_cost(origin_hash, destination_hash, count=None):

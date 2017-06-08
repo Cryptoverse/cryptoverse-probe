@@ -81,6 +81,11 @@ EVENT_TYPES = [
     'transfer'
 ]
 
+EVENT_MODEL_TYPES = [
+    'unknown',
+    'vessel'
+]
+
 SHIP_EVENT_TYPES = [
     'unknown',
     'reward',
@@ -530,7 +535,15 @@ def get_event_type_name(event_id):
     Returns:
         str: Str of the event type.
     """
-    get_array_name(EVENT_TYPES, event_id)
+    return get_array_name(EVENT_TYPES, event_id)
+
+
+def get_event_model_type_id(module_name):
+    return get_array_index(EVENT_MODEL_TYPES, module_name)
+
+
+def get_event_model_type_name(module_id):
+    return get_array_name(EVENT_MODEL_TYPES, module_id)
 
 
 def get_module_type_id(module_name):
@@ -538,7 +551,7 @@ def get_module_type_id(module_name):
 
 
 def get_module_type_name(module_id):
-    return get_array_index(MODULE_TYPES, module_id)
+    return get_array_name(MODULE_TYPES, module_id)
 
 
 def get_jump_cost(origin_hash, destination_hash, count=None):

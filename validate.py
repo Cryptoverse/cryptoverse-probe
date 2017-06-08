@@ -1,12 +1,14 @@
-import re
 import binascii
+import re
+
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_public_key
-import util
 
+import util
+import blueprints
 
 def byte_size(limit, target):
     if limit < len(target):
@@ -20,18 +22,22 @@ def field_is_sha256(sha, field_name=None):
         sha (str): Hash to verify.
     """
     if not re.match(r'^[A-Fa-f0-9]{64}$', sha):
-        raise Exception('Field is not a hash' if field_name is None else 'Field %s is not a hash' % field_name)
+        raise Exception('Field is not a hash' if field_name is None
+                        else 'Field %s is not a hash' % field_name)
 
 
 def rsa(public_key, signature, message):
     """Verifies an RSA signature.
     Args:
         public_key (str): Public key with BEGIN and END sections.
-        signature (str): Hex value of the signature with its leading 0x stripped.
+        signature (str): Hex value of the signature with
+        its leading 0x stripped.
         message (str): Message that was signed, unhashed.
     """
     try:
-        public_rsa = load_pem_public_key(bytes(public_key), backend=default_backend())
+        public_rsa = load_pem_public_key(bytes(public_key),
+                                         backend=default_backend()
+                                         )
         hashed = util.sha256(message)
         public_rsa.verify(
             binascii.unhexlify(signature),
@@ -102,7 +108,6 @@ def events(events_json):
     Args:
         events_json (dict): Events json.
     """
-    remaining_ship_rewards = util.shipReward()
     input_keys = []
     output_keys = []
     for current_event in events_json:
@@ -112,12 +117,14 @@ def events(events_json):
                 raise Exception('reward events cannot have inputs')
             if len(current_event['outputs']) == 0:
                 raise Exception('reward events with no recipients should not be included')
-            for current_output in current_event['outputs']:
-                remaining_ship_rewards -= current_output['count']
-                if remaining_ship_rewards < 0:
-                    raise Exception('number of ships rewarded is out of range')
-                if current_output['type'] != 'reward':
-                    raise Exception('reward outputs must be of type "reward"')
+            if len(current_event['outputs']) != 1:
+                raise Exception('reward cannot contain more than one vessel')
+            reward_event = current_event['outputs'][0]
+            if reward_event['type'] != 'reward':
+                raise Exception('reward vessel must be marked as a reward')
+            if reward_event['model_type'] != 'vessel':
+                raise Exception('a reward must be of type vessel')
+            vessels_are_equal(reward_event['model'], blueprints.DEFAULT_VESSEL)
         elif current_event['type'] == 'jump':
             if len(current_event['inputs']) == 0:
                 raise Exception('jump events cannot have zero inputs')
@@ -126,11 +133,13 @@ def events(events_json):
                 raise Exception('jump events cannot have zero outputs')
             if 2 < output_length:
                 raise Exception('jump events cannot have more than 2 outputs')
-            if 2 == output_length and current_event['outputs'][0]['star_system'] == current_event['outputs'][1]['star_system']:
+            if 2 == output_length and \
+                current_event['outputs'][0]['star_system'] == current_event['outputs'][1]['star_system']:
                 raise Exception('jump event cannot split in new system')
             for current_output in current_event['outputs']:
                 if current_output['count'] <= 0:
-                    raise Exception('jump events cannot jump zero or less ships')
+                    raise Exception('jump events cannot jump '
+                                    'zero or less ships')
                 if current_output['type'] != 'jump':
                     raise Exception('jump outputs must be of type "jump"')
         elif current_event['type'] == 'attack':
@@ -140,7 +149,8 @@ def events(events_json):
                 raise Exception('attacks cannot have more outputs than inputs')
             for current_output in current_event['outputs']:
                 if current_output['count'] <= 0:
-                    raise Exception('attack events cannot outputs zero or less ships')
+                    raise Exception('attack events cannot outputs '
+                                    'zero or less ships')
                 if current_output['type'] != 'attack':
                     raise Exception('attack outputs must be of type "attack"')
         elif current_event['type'] == 'transfer':
@@ -154,27 +164,34 @@ def events(events_json):
                 if current_output['type'] != 'transfer':
                     raise Exception('transfer outputs must be of type "transfer"')
         else:
-            raise ValueError('unrecognized event of type %s' % current_event['type'])
+            raise ValueError('unrecognized event of type '
+                             '%s' % current_event['type'])
 
         for current_input in current_event['inputs']:
             key = current_input['key']
             if key in input_keys:
-                raise Exception('event input key %s is listed more than once' % key)
+                raise Exception('event input key %s '
+                                'is listed more than once' % key)
             input_keys.append(key)
         for current_output in current_event['outputs']:
             key = current_output['key']
             if key in output_keys:
-                raise Exception('event output key %s is listed more than once' % key)
+                raise Exception('event output key %s '
+                                'is listed more than once' % key)
             output_keys.append(key)
 
 
-def event(event_json, require_index=True, require_star_system=False, reward_allowed=True):
+def event(event_json,
+          require_index=True,
+          require_star_system=False,
+          reward_allowed=True):
     """Verifies the fields of an event.
 
     Args:
         event_json (dict): Target.
         require_index (bool): Verifies an integer index is included if True.
-        require_star_system (bool): Verifies that every output specifies a star system if True.
+        require_star_system (bool): Verifies that every output specifies a
+        star system if True.
     """
     if not isinstance(event_json['type'], basestring):
         raise Exception('type is not a string')
@@ -215,7 +232,9 @@ def event(event_json, require_index=True, require_star_system=False, reward_allo
 
     field_is_sha256(event_json['fleet_hash'], 'fleet_hash')
     sha256(event_json['fleet_hash'], event_json['fleet_key'], 'fleet_key')
-    rsa(util.expand_rsa_public_key(event_json['fleet_key']), event_json['signature'], event_json['hash'])
+    rsa(util.expand_rsa_public_key(event_json['fleet_key']),
+        event_json['signature'],
+        event_json['hash'])
 
 
 def event_input(input_json):
@@ -245,17 +264,133 @@ def event_output(output_json, require_star_system=False):
         if not isinstance(output_json['star_system'], basestring):
             raise Exception('star_system is not a string')
         field_is_sha256(output_json['star_system'], 'star_system')
-    if not isinstance(output_json['count'], int):
-        raise Exception('count is not an integer')
+    
+    model_type = output_json['model_type']
+    if not isinstance(model_type, basestring):
+        raise Exception('model_type is not a string')
+    if output_json['model'] is None:
+        raise Exception('model is missing')
+    
+    if model_type == 'vessel':
+        vessel(output_json['model'])
+    else:
+        raise Exception('model_type %s is not recognized' % model_type)
 
     if output_json['index'] < 0:
         raise Exception('index is out of range')
-    if output_json['count'] <= 0:
-        raise Exception('count is out of range')
 
     field_is_sha256(output_json['fleet_hash'], 'fleet_hash')
     field_is_sha256(output_json['key'], 'key')
 
+def vessel(vessel_json):
+    """Validates the json of a vessel.
+
+    Args:
+        vessel_json (dict): Vessel to validate.
+    """
+    if vessel_json['blueprint'] is None:
+        raise Exception('blueprint is missing')
+    if vessel_json['modules'] is None:
+        raise Exception('modules is missing')
+    
+    for current_module in vessel_json['modules']:
+        if current_module is None:
+            raise Exception('a module is missing')
+        module(current_module)
+
+def module(module_json):
+    """Validates that the fields of a module are present in the provided json.
+
+    Args:
+        module_json (dict): The module to validate.
+    """
+    if module_json['blueprint'] is None:
+        raise Exception('blueprint is missing')
+    if module_json['delta'] is None or not isinstance(module_json['delta'], bool):
+        raise Exception('delta is missing')
+    if module_json['health'] is None:
+        raise Exception('health is missing')
+    if module_json['health'] < 0 or util.MAXIMUM_INTEGER < module_json['health']:
+        raise Exception('health is out of range')
+    if not isinstance(module_json['index'], int):
+        raise Exception('index is not an integer')
+    if module_json['index'] < 0:
+        raise Exception('index is out of range')
+    
+    module_type = module_json['module_type']
+    if module_type == 'jump_drive':
+        jump_drive(module_json)
+    elif module_type == 'cargo':
+        cargo(module_json)
+    elif module_type == 'weapon':
+        weapon(module_json)
+    else:
+        raise Exception('module_type %s is not recognized')
+
+
+def jump_drive(jump_drive_json):
+    pass
+
+
+def cargo(cargo_json):
+    for current_resource in cargo_json['contents'].keys():
+        if current_resource not in util.RESOURCE_TYPES:
+            raise Exception('resource %s not recognized' % current_resource)
+        current_value = cargo_json['contents'][current_resource]
+        if current_value < 0 or util.MAXIMUM_INTEGER < current_value:
+            raise Exception('resource %s is out of range' % current_resource)
+
+
+def weapon(weapon_json):
+    raise Exception('not implimented')
+
+
+def vessels_are_equal(vessel_json0, vessel_json1):
+    if vessel_json0['blueprint'] != vessel_json1['blueprint']:
+        raise Exception('hull blueprints do not match')
+    if len(vessel_json0['modules']) != len(vessel_json1['modules']):
+        raise Exception('number of modules do not match')
+    for current_module in vessel_json0['modules']:
+        other_module = [x for x in vessel_json1['modules'] if x['index'] == current_module['index']]
+        if other_module is None:
+            raise Exception('unable to find matching index %s' % current_module['index'])
+        modules_are_equal(current_module, other_module[0])
+        
+
+def modules_are_equal(module_json0, module_json1):
+    if module_json0['blueprint'] != module_json1['blueprint']:
+        raise Exception('blueprint does not match')
+    if module_json0['delta'] != module_json1['delta']:
+        raise Exception('delta does not match')
+    if module_json0['health'] != module_json1['health']:
+        raise Exception('health does not match')
+    if module_json0['index'] != module_json1['index']:
+        raise Exception('index does not match')
+    if module_json0['module_type'] != module_json1['module_type']:
+        raise Exception('module_type does not match')
+    
+    current_type = module_json0['module_type']
+    if current_type == 'jump_drive':
+        jump_drives_are_equal(module_json0, module_json1)
+    elif current_type == 'cargo':
+        cargos_are_equal(module_json0, module_json1)
+    elif current_type == 'weapon':
+        weapons_are_equal(module_json0, module_json1)
+    else:
+        raise Exception('module_type %s not recognized' % current_type)
+
+def jump_drives_are_equal(jump_drive_json0, jump_drive_json1):
+    pass
+
+def cargos_are_equal(cargo_json0, cargo_json1):
+    if len(cargo_json0['contents']) != len(cargo_json1['contents']):
+        raise Exception('contents count does not match')
+    for current_resource in cargo_json0['contents'].keys():
+        if cargo_json0['contents'][current_resource] != cargo_json1['contents'][current_resource]:
+            raise Exception('resource count for %s does not match' % current_resource)
+
+def weapons_are_equal(weapon_json0, weapon_json1):
+    raise Exception('not implimented yet')
 
 def event_rsa(event_json):
     """Verifies the RSA signature of the provided event json.
@@ -264,16 +399,20 @@ def event_rsa(event_json):
         event_json (dict): Event to validate.
     """
     try:
-        rsa(util.expand_rsa_public_key(event_json['fleet_key']), event_json['signature'], util.concat_event(event_json))
+        rsa(util.expand_rsa_public_key(event_json['fleet_key']),
+            event_json['signature'],
+            util.concat_event(event_json))
     except InvalidSignature:
         raise Exception('Invalid RSA signature')
 
 
 def difficulty(packed, sha, validate_params=True):
-    """Takes the integer form of difficulty and verifies that the hash is less than it.
+    """Takes the integer form of difficulty and verifies that the hash is
+     less than it.
 
     Args:
-        packed (int): Packed target difficulty the provided SHA256 hash must meet.
+        packed (int): Packed target difficulty the provided
+        SHA256 hash must meet.
         sha (str): Hex target to test, stripped of its leading 0x.
     """
     if validate_params:
@@ -286,11 +425,16 @@ def difficulty(packed, sha, validate_params=True):
     difficulty_unpacked(mask, leading_zeros, sha, validate_params)
 
 
-def difficulty_unpacked(unpacked_stripped, leading_zeros, sha, validate_params=True):
-    """Takes the unpacked form of difficulty and verifies that the hash is less than it.
+def difficulty_unpacked(unpacked_stripped,
+                        leading_zeros,
+                        sha,
+                        validate_params=True):
+    """Takes the unpacked form of difficulty and verifies that the hash
+     is less than it.
 
     Args:
-        unpacked_stripped (str): Unpacked target difficulty the provided SHA256 hash must meet.
+        unpacked_stripped (str): Unpacked target difficulty the
+        provided SHA256 hash must meet.
         sha (str): Hex target to test, stripped of its leading 0x.
     """
     if validate_params:

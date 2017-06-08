@@ -66,7 +66,7 @@ def eventsMaxLimit():
 def chainsMaxLimit():
     return int(os.getenv('CHAINS_MAX_LIMIT', '10'))
 
-
+MAXIMUM_INTEGER = 2147483647
 MAXIMUM_NONCE = 2147483647
 MAXIMUM_TARGET = '00000000ffffffffffffffffffffffff' \
                  'ffffffffffffffffffffffffffffffff'

@@ -579,17 +579,57 @@ def list_all_deployments(from_star_log, verbose):
     for deployment in deployments:
         system = deployment['star_system']
         fleet = deployment['fleet_hash']
-        count = deployment['count']
         if system in systems:
             current_system = systems[system]
         else:
             current_system = {}
             systems[system] = current_system
         
-        if fleet in current_system:
-            current_system[fleet] += count
+        active_jump_drives = 0
+        broken_jump_drives = 0
+        accessible_fuel = 0
+        inaccessible_fuel = 0
+
+        for module in deployment['model']['modules']:
+            module_type = module['module_type']
+            module_active = 0 < module['health']
+            if module_type == 'jump_drive':
+                if module_active:
+                    active_jump_drives += 1
+                else:
+                    broken_jump_drives += 1
+            elif module_type == 'cargo':
+                contents = module['contents']
+                if module_active:
+                    accessible_fuel += contents.get('fuel', 0)
+                else:
+                    inaccessible_fuel += contents.get('fuel', 0)
+
+        jump_status = 'No jump capability'
+        fuel_status = 'with no fuel'
+
+        if 0 < active_jump_drives:
+            jump_status = 'Jump capable'
+        elif 0 < broken_jump_drives:
+            jump_status = 'Jump drive broken'
+        
+        if 0 < accessible_fuel:
+            if 0 < inaccessible_fuel:
+                fuel_status = 'with %s fuel accessible, and %s fuel in an inaccessible cargo tank' % (accessible_fuel, inaccessible_fuel)
+            else:
+                fuel_status = 'with %s fuel' % accessible_fuel
+        elif 0 < inaccessible_fuel:
+            fuel_status = 'with %s fuel in an inaccessible cargo tank' % inaccessible_fuel
         else:
-            current_system[fleet] = count
+            fuel_status = 'with no fuel'
+        
+        vessel_status = '%s %s %s' % (util.get_vessel_name(deployment['key']), jump_status, fuel_status)
+
+        if fleet in current_system:
+            current_system[fleet].append(vessel_status)
+        else:
+            current_system[fleet] = [ vessel_status ]
+        
     result = 'No deployments in any systems'
     account_hash = util.sha256(database.get_account()['public_key'])
     if systems:
@@ -601,9 +641,11 @@ def list_all_deployments(from_star_log, verbose):
             fleet_keys = systems[current_system].keys()
             for fleet_key in range(0, len(fleet_keys)):
                 current_fleet = fleet_keys[fleet_key]
-                fleet_count = systems[current_system][current_fleet]
+                vessel_list = ''
+                for current_vessel in systems[current_system][current_fleet]:
+                    vessel_list += '\t\t%s\n' % current_vessel
                 active_flag = '[CURR] ' if current_fleet == account_hash else ''
-                result += '\n%s\t - %s : %s' % (active_flag, util.get_fleet_name(current_fleet), fleet_count)
+                result += '\n%s\t - %s\n%s' % (active_flag, util.get_fleet_name(current_fleet), vessel_list)
     print result
         
     

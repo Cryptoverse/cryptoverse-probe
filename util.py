@@ -68,10 +68,8 @@ def chainsMaxLimit():
 
 MAXIMUM_INTEGER = 2147483647
 MAXIMUM_NONCE = 2147483647
-MAXIMUM_TARGET = '00000000ffffffffffffffffffffffff' \
-                 'ffffffffffffffffffffffffffffffff'
-EMPTY_TARGET = '00000000000000000000000000000000' \
-               '00000000000000000000000000000000'
+MAXIMUM_TARGET = '00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff'
+EMPTY_TARGET = '0000000000000000000000000000000000000000000000000000000000000000'
 
 EVENT_TYPES = [
     'unknown',
@@ -675,6 +673,17 @@ def get_system_name(system_hash, length=6):
     """
     return '[%s]' % get_shortened_hash(system_hash, length)
 
+def get_vessel_name(event_hash, length=6):
+    """Gets the human readable name for a vessel.
+
+    Args:
+        event_hash (str): The event key for this vessel as a Sha256 hash.
+        length (int): The length of the shortened name.
+
+    Returns:
+        str: The shortened name.
+    """
+    return '<%s>' % get_shortened_hash(event_hash, length)
 
 def get_shortened_hash(sha, length=6, strip_zeros=True):
     """Gets the human readable name for a hash.

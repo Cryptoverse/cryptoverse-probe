@@ -763,7 +763,7 @@ def jump(params=None):
 
     inputs = [ get_event_input(0, vessel_event['key']) ]
 
-    jump_key = util.sha256('%s%s%s%s' % (util.get_time(), fleet_hash, origin_hash, destination_hash))
+    jump_key = util.sha256(vessel_event['key'])
     vessel, remainder = util.subtract_vessel_resources(vessel, { 'fuel': jump_cost })
     outputs = [ get_event_output(0, vessel, 'vessel', fleet_hash, jump_key, destination_hash, 'jump') ]
 

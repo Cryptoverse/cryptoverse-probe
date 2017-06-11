@@ -74,7 +74,7 @@ def get_event_input(index, key):
     }
 
 
-def get_event_output(index, count, fleet_hash, key, star_system, type_name):
+def get_event_output(index, model, model_type, fleet_hash, key, star_system, type_name):
     return {
         'index': index,
         'model': model,
@@ -726,60 +726,46 @@ def jump(params=None):
     lossy = True
     count = None
     if not putil.has_any(params):
-        raise CommandException('Specify an origin and destination system')
+        raise CommandException('Specify a vessel and a destination system')
     if len(params) < 2:
-        raise CommandException('An origin and destination system must be specified')
-    origin_fragment = params[0]
+        raise CommandException('A vessel and a destination system must be specified')
+    vessel_fragment = params[0]
     destination_fragment = params[1]
-    if 2 < len(params) and isinstance(params[2], int):
-        count = int(params[2])
+    account_info = database.get_account()
+    fleet_hash = util.sha256(account_info['public_key'])
+    deployments = database.get_unused_events(fleet_hash=fleet_hash, model_type='vessel')
+    vessel_key = putil.natural_match(vessel_fragment, [x['key'] for x in deployments])
+    if vessel_key is None:
+        raise CommandException('Unable to find a vessel key containing %s belonging to your fleet' % vessel_fragment)
+    vessel_event = [x for x in deployments if x['key'] == vessel_key][0]
+    vessel = vessel_event['model']
+    found_jump_drive = False
+    for jump_module in [x for x in vessel['modules'] if x['module_type'] == 'jump_drive']:
+        found_jump_drive = 0 < jump_module['health']
+        if found_jump_drive:
+            jump_module['delta'] = not jump_module['delta']
+            break
+    
+    if not found_jump_drive:
+        raise CommandException('Vessel has no working jump drives')
+    
     hashes = database.get_star_log_hashes()
-    origin_hash = putil.natural_match(origin_fragment, hashes)
-    if origin_hash is None:
-        raise CommandException('Unable to find an origin system containing %s' % origin_fragment)
     destination_hash = putil.natural_match(destination_fragment, hashes)
     if destination_hash is None:
         raise CommandException('Unable to find a destination system containing %s' % destination_fragment)
-    if not database.get_star_logs_share_chain([origin_hash, destination_hash]):
-        raise CommandException('Systems %s and %s exist on different chains' % (util.get_system_name(origin_hash), util.get_system_name(destination_hash)))
-    highest_hash = database.get_star_log_highest(database.get_star_log_highest_from_list([origin_hash, destination_hash]))['hash']
-    account_info = database.get_account()
-    fleet_hash = util.sha256(account_info['public_key'])
-    deployments = database.get_unused_events(from_star_log=highest_hash, system_hash=origin_hash, fleet_hash=fleet_hash)
-    total_ships = 0
-    for deployment in deployments:
-        total_ships += deployment['count']
-    if count is None:
-        count = total_ships
-        lossy = True
-    elif total_ships < count:
-        raise CommandException('Not enough ships to jump from the origin system')
-    if count <= 0:
-        raise CommandException('A number of ships greater than zero must be specified for a jump')
-    # TODO: Insert support for non-lossy jumps here.
-    jump_cost = util.get_jump_cost(destination_hash, origin_hash, count)
-    if jump_cost == count:
-        raise CommandException('Unable to complete a jump where all ships would be lost')
-
+    origin_hash = vessel_event['star_system']
+    accessible_fuel = util.get_vessel_resources(vessel)['fuel']
+    jump_cost = util.get_jump_cost(origin_hash, destination_hash)
+    if jump_cost == -1 or accessible_fuel <= jump_cost:
+        raise CommandException('Not enough fuel to complete jump')
+    
     jump_event = get_event_signature(fleet_hash, account_info['public_key'], event_type='jump')
 
-    inputs = []
-    input_index = 0
-    total_input_count = 0
-    for deployment in deployments:
-        total_input_count += deployment['count']
-        inputs.append(get_event_input(input_index, deployment['key']))
-        input_index += 1
-        if count <= total_input_count:
-            break
-    extra_ships = total_input_count - count
-    outputs = []
-    index = 0
+    inputs = [ get_event_input(0, vessel_event['key']) ]
+
     jump_key = util.sha256('%s%s%s%s' % (util.get_time(), fleet_hash, origin_hash, destination_hash))
-    if 0 < extra_ships:
-        outputs.append(get_event_output(index, extra_ships, fleet_hash, util.get_unique_key(), origin_hash, 'jump'))
-        index += 1
-    outputs.append(get_event_output(index, count - jump_cost, fleet_hash, jump_key, destination_hash, 'jump'))
+    vessel, remainder = util.subtract_vessel_resources(vessel, { 'fuel': jump_cost })
+    outputs = [ get_event_output(0, vessel, 'vessel', fleet_hash, jump_key, destination_hash, 'jump') ]
 
     jump_event['inputs'] = inputs
     jump_event['outputs'] = outputs

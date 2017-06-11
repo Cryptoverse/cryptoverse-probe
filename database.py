@@ -322,7 +322,7 @@ def get_star_logs_share_chain(system_hashes):
     return False
 
 
-def get_unused_events(from_star_log=None, system_hash=None, fleet_hash=None):
+def get_unused_events(from_star_log=None, system_hash=None, fleet_hash=None, model_type=None):
     if from_star_log is None:
         from_star_log = get_star_log_highest(system_hash)['hash']
     used_events = []
@@ -335,7 +335,9 @@ def get_unused_events(from_star_log=None, system_hash=None, fleet_hash=None):
             for event_input in event['inputs']:
                 used_events.append(event_input['key'])
             for event_output in event['outputs']:
-                if event_output['type'] in util.SHIP_EVENT_TYPES and event_output['key'] not in used_events:
+                if model_type != None and event_output['model_type'] != model_type:
+                    continue
+                if event_output['key'] not in used_events:
                     if system_hash is not None:
                         if event_output['star_system'] is None:
                             if from_star_log != system_hash:

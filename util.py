@@ -44,11 +44,11 @@ def cartesianDigits():
 
 
 def jumpCostMinimum():
-    return float(os.getenv('JUMP_COST_MIN', '0.01'))
+    return int(os.getenv('JUMP_COST_MIN', '1'))
 
 
 def jumpCostMaximum():
-    return float(os.getenv('JUMP_COST_MAX', '1.0'))
+    return int(os.getenv('JUMP_COST_MAX', '1000'))
 
 
 def jumpDistanceMaximum():
@@ -114,11 +114,11 @@ def get_maximum_target():
 if not 3 <= cartesianDigits() <= 21:
     raise Exception('CARTESIAN_DIGITS must be a value from 3 to 21 (inclusive)')
 
-if not 0 <= jumpCostMinimum() < 1:
-    raise Exception('JUMP_COST_MIN must be a value from 0.0 to 1.0 (inclusive - exclusive)')
+if not 0 <= jumpCostMinimum():
+    raise Exception('JUMP_COST_MIN must be equal to or greater than zero')
 
-if not 0 < jumpCostMaximum() <= 1:
-    raise Exception('JUMP_COST_MAX must be a value from 0.0 to 1.0 (exclusive - inclusive)')
+if not 0 < jumpCostMaximum():
+    raise Exception('JUMP_COST_MAX must be equal to or greater than zero')
 
 if jumpCostMaximum() <= jumpCostMinimum():
     raise Exception('JUMP_COST_MIN must be less than JUMP_COST_MAX')
@@ -552,28 +552,28 @@ def get_module_type_name(module_id):
     return get_array_name(MODULE_TYPES, module_id)
 
 
-def get_jump_cost(origin_hash, destination_hash, count=None):
-    """Gets the floating point scalar for the number of ships that will be lost in this jump.
+def get_jump_cost(origin_hash, destination_hash):
+    """Gets the fuel cost for this jump.
 
     Args:
         origin_hash (str): The starting hash of the jump.
         destination_hash (str): The ending hash of the jump.
-        count (int): The number of ships in the jump.
     
     Returns:
-        float: A scalar value of the ships lost in the jump.
+        int: The fuel requirement for this jump.
     """
     distance = get_distance(origin_hash, destination_hash)
     max_distance = jumpDistanceMaximum()
     cost_max = jumpCostMaximum()
-    if max_distance <= distance:
-        return cost_max if count is None else int(math.ceil(cost_max * count))
+    if max_distance < distance:
+        return -1
+    elif max_distance == distance:
+        return cost_max
     # Scalar is x^2
     scalar = math.sqrt(distance / max_distance)
     cost_min = jumpCostMinimum()
-    cost_range = 1.0 - ((1.0 - cost_max) + cost_min)
-    scalar = cost_min + (cost_range * scalar)
-    return scalar if count is None else int(math.ceil(scalar * count))
+    cost_range = cost_max - cost_min
+    return int(math.ceil(cost_min + (cost_range * scalar)))
 
 
 def get_cartesian_minimum():
@@ -673,6 +673,7 @@ def get_system_name(system_hash, length=6):
     """
     return '[%s]' % get_shortened_hash(system_hash, length)
 
+
 def get_vessel_name(event_hash, length=6):
     """Gets the human readable name for a vessel.
 
@@ -684,6 +685,7 @@ def get_vessel_name(event_hash, length=6):
         str: The shortened name.
     """
     return '<%s>' % get_shortened_hash(event_hash, length)
+
 
 def get_shortened_hash(sha, length=6, strip_zeros=True):
     """Gets the human readable name for a hash.
@@ -699,6 +701,43 @@ def get_shortened_hash(sha, length=6, strip_zeros=True):
         return sha
     else:
         return sha[:length]
+
+
+def get_vessel_resources(vessel, include_inaccessible=False):
+    result = {}
+    resources = [x for x in RESOURCE_TYPES if x != 'unknown']
+    for resource in resources:
+        result[resource] = 0
+    for module in [x for x in vessel['modules'] if x['module_type'] == 'cargo']:
+        if module['health'] == 0 and not include_inaccessible:
+            continue
+        for resource in resources:
+            result[resource] += module['contents'].get(resource, 0)
+    return result
+
+
+def subtract_vessel_resources(vessel, resources, include_inaccessible=False, flip_deltas=True):
+    for module in [x for x in vessel['modules'] if x['module_type'] == 'cargo']:
+        if module['health'] == 0 and not include_inaccessible:
+            continue
+        contents = module['contents']
+        has_changed = False
+        for resource in resources.keys():
+            if resources[resource] == 0:
+                continue
+            current_resource_count = contents.get(resource, 0)
+            if current_resource_count == 0:
+                continue
+            if resources[resource] <= current_resource_count:
+                contents[resource] = current_resource_count - resources[resource]
+                resources[resource] = 0
+            else:
+                resources[resource] -= current_resource_count
+                contents[resource] = 0
+            has_changed = True
+        if has_changed:
+            module['delta'] = not module['delta']
+    return (vessel, resources)
 
 
 def get_time():

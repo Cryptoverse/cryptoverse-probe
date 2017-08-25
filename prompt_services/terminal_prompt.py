@@ -27,4 +27,8 @@ class TerminalPrompt(BasePrompt):
         self.double_escape_sequence = [27, 27]
 
     def on_output(self, message = None, cursor_index = -1):
-        stdout.write('\r%s%s%s%s%s' % (self.COMMAND_PREFIX, self.BOLD_COLOR, message, self.DEFAULT_COLOR, self.CURSOR_ERASE_SEQUENCE))
+        if message != None:
+            stdout.write('\r%s%s%s%s%s' % (self.COMMAND_PREFIX, self.BOLD_COLOR, message, self.DEFAULT_COLOR, self.CURSOR_ERASE_SEQUENCE))
+        if cursor_index != None:
+            stdout.write('\r%s' % (self.CURSOR_FORWARD_SEQUENCE % (cursor_index + len(self.COMMAND_PREFIX))))
+        

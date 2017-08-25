@@ -67,11 +67,12 @@ class CommandService(object):
         if old_command != self.command:
             current_output = self.command
         if old_command_index != self.command_index:
-            current_cursor = -1
+            current_cursor = self.command_index
 
         if poll_result.is_return or poll_result.is_double_escape:
             current_output = '\n'
             current_cursor = -1
+        
         if poll_result.is_double_escape:
             self.command = None
             self.command_index = 0

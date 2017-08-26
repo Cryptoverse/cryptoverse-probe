@@ -16,8 +16,8 @@ class CallbackService(object):
     def on_input(self, poll_result):
         self.input(poll_result)
 
-    def on_output(self, message = None):
-        self.output(message)
+    def on_output(self, message = None, prompt = True):
+        self.output(message, prompt)
 
     def on_prompt_output(self, message = None, cursor_index = -1):
         self.prompt_output(message, cursor_index)

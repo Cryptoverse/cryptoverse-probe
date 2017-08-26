@@ -38,6 +38,8 @@ class TerminalPrompt(BasePrompt):
     def on_any_command(self, *args):
         stdout.write('\n')
 
-    def on_output(self, message = None):
-        print message
-        self.on_prompt_output('', 0)
+    def on_output(self, message = None, prompt = True):
+        stdout.write(message)
+        if prompt:
+            stdout.write('\n')
+            self.on_prompt_output('', 0)

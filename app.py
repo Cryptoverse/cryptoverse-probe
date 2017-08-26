@@ -21,5 +21,9 @@ class App():
             self.callbacks.on_update((now - last_update).total_seconds())
             last_update = now
 
+    def exit(self, reason = 'User request'):
+        self.callbacks.on_output('Exiting: %s' % reason, False)
+        self.exited = True
+
     def on_update(self, delta):
         pass

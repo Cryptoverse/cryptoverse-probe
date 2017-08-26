@@ -1,4 +1,4 @@
-# from sys import stdout, platform
+import traceback
 from app import App
 
 def run():
@@ -6,5 +6,10 @@ def run():
     app.begin()
 
 if __name__ == '__main__':
-    run()
+    try:
+        run()
+    except:
+        traceback.print_exc()
+        print ''
+        raw_input("Press enter to quit...")
     # stdout.write('\nExiting...\n')

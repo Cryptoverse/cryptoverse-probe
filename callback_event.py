@@ -1,10 +1,10 @@
 class CallbackEvent():
 
     def __init__(self):
-        self.handlers = set()
+        self.handlers = list()
 
     def add(self, handler):
-        self.handlers.add(handler)
+        self.handlers.append(handler)
         return self
 
     def remove(self, handler):

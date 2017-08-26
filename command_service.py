@@ -12,8 +12,11 @@ class CommandService(object):
         self.app.callbacks.input += self.on_input
 
         self.commands = []
+        self.command_names = []
         for current_command in ALL_COMMANDS:
-            self.commands.append(current_command(app))
+            command_instance = current_command(app)
+            self.commands.append(command_instance)
+            self.command_names.append(command_instance.name)
 
 
     def on_input(self, poll_result):
@@ -69,31 +72,58 @@ class CommandService(object):
         if old_command_index != self.command_index:
             current_cursor = self.command_index
 
-        if poll_result.is_return or poll_result.is_double_escape:
-            current_output = '\n'
-            current_cursor = -1
-        
         if poll_result.is_double_escape:
-            self.command = None
-            self.command_index = 0
-            self.command_history = -1
+            self.reset_command()
             return
     
-        if current_output != None or current_cursor != None:
-            self.app.callbacks.on_output(current_output, current_cursor)
         if poll_result.is_return:
-            # TODO: Is command run???
-            pass
+            # Run command
+            
+            command_name, command_parameters = self.explode_command(self.command)
+
+            if command_name is None:
+                return
+
+            self.add_command(self.command)
+            
+            if command_name in self.command_names:
+                self.app.callbacks.on_enter_command(command_name, command_parameters)
+            else:
+                self.app.callbacks.on_undefined_command(command_name, command_parameters)
+                self.app.callbacks.on_output('Command "%s" not found, try typing "help" to see all commands' % command_name)
+            self.reset_command()
+        elif current_output != None or current_cursor != None:
+            self.app.callbacks.on_prompt_output(current_output, current_cursor)
 
     def register_command(self, command):
         if any(c.name == command.name for c in self.commands):
             raise Exception('A command definition for %s already exists' % command.name)
         self.commands.add(command)
 
-    
+    def reset_command(self):
+        self.command = None
+        self.command_index = 0
+        self.command_history = -1
+
+    def explode_command(self, command):
+        if self.command == '':
+            return (None, None)
+        
+        elements = command.split()
+        name = elements[0]
+        parameters = []
+        if 1 < len(elements):
+            for current_parameter in elements[1:]:
+                parameters.append(current_parameter)
+        return (name, parameters)
+
     # Database functionality...
     def get_command(self, index):
         return 'Not impl'
+
+    def add_command(self, command):
+        # TODO: Add command to history, if not already in it
+        pass
 
     def count_commands(self):
         return 0

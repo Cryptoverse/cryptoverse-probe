@@ -5,7 +5,6 @@ class BaseCommand(object):
         self.name = name
         self.description = kwargs.get('description', 'No description provided')
         self.parameter_usages = kwargs.get('parameter_usages', [])
-        self.command = kwargs.get('command', self.on_missing_command)
 
         self.app.callbacks.enter_command += self.on_enter_command
 
@@ -14,7 +13,7 @@ class BaseCommand(object):
 
     def on_enter_command(self, command, *args):
         if command == self.name:
-            self.command(*args)
+            self.on_command(*args)
 
-    def on_missing_command(self, *args):
+    def on_command(self, *args):
         self.app.callbacks.on_output('Command "%s" is not implemented' % self.name)

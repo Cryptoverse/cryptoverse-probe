@@ -9,8 +9,7 @@ class HelpCommand(BaseCommand):
             description = 'This help message',
             parameter_usages = [
                 '"help <command>" to list command details'
-            ],
-            command = self.on_command
+            ]
         )
 
     def on_command(self, *args):

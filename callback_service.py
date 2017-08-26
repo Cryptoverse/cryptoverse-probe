@@ -9,6 +9,7 @@ class CallbackService(object):
         self.prompt_output = Event()
         self.enter_command = Event()
         self.undefined_command = Event()
+        self.error = Event()
 
     def on_update(self, delta):
         self.update(delta)
@@ -23,7 +24,10 @@ class CallbackService(object):
         self.prompt_output(message, cursor_index)
 
     def on_enter_command(self, command, *args):
-        self.enter_command(command)
+        self.enter_command(command, *args)
 
     def on_undefined_command(self, command, *args):
-        self.undefined_command(command)
+        self.undefined_command(command, *args)
+
+    def on_error(self, message):
+        self.error(message)

@@ -18,7 +18,6 @@ class CommandService(object):
             self.commands.append(command_instance)
             self.command_names.append(command_instance.name)
 
-
     def on_input(self, poll_result):
 
         current_output = None
@@ -45,14 +44,14 @@ class CommandService(object):
             return
         elif poll_result.is_up:
             self.command_history = min(self.command_history + 1, self.count_commands() - 1)
-            self.command = self.get_command(self.command_history)
+            self.command = self.get_from_history(self.command_history)
             self.command_index = 0 if self.command is None else len(self.command)
         elif poll_result.is_down:
             self.command_history = max(self.command_history - 1, -1)
             if self.command_history < 0:
                 self.command = ''
             else:
-                self.command = self.get_command(self.command_history)
+                self.command = self.get_from_history(self.command_history)
             self.command_index = 0 if self.command is None else len(self.command)
         elif poll_result.is_left:
             if 0 < self.command_index:
@@ -80,17 +79,17 @@ class CommandService(object):
             # Run command
             
             command_name, command_parameters = self.explode_command(self.command)
-
+            
             if command_name is None:
                 return
 
-            self.add_command(self.command)
+            self.add_to_history(self.command)
             
             if command_name in self.command_names:
-                self.app.callbacks.on_enter_command(command_name, command_parameters)
+                self.app.callbacks.on_enter_command(command_name, *command_parameters)
             else:
-                self.app.callbacks.on_undefined_command(command_name, command_parameters)
-                self.app.callbacks.on_output('Command "%s" not found, try typing "help" to see all commands' % command_name)
+                self.app.callbacks.on_undefined_command(command_name, *command_parameters)
+                self.app.callbacks.on_error('Command "%s" not found, try typing "help" to see all commands' % command_name)
             self.reset_command()
         elif current_output != None or current_cursor != None:
             self.app.callbacks.on_prompt_output(current_output, current_cursor)
@@ -117,11 +116,14 @@ class CommandService(object):
                 parameters.append(current_parameter)
         return (name, parameters)
 
+    def get_command(self, name):
+        return next(command for command in self.commands if command.name == name)
+
     # Database functionality...
-    def get_command(self, index):
+    def get_from_history(self, index):
         return 'Not impl'
 
-    def add_command(self, command):
+    def add_to_history(self, command):
         # TODO: Add command to history, if not already in it
         pass
 

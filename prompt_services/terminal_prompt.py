@@ -17,6 +17,7 @@ class TerminalPrompt(BasePrompt):
         self.app.callbacks.enter_command += self.on_any_command
         self.app.callbacks.undefined_command += self.on_any_command
         self.app.callbacks.output += self.on_output
+        self.app.callbacks.error += self.on_error
 
     def define_sequences(self):
         self.return_sequence = [13]
@@ -28,6 +29,9 @@ class TerminalPrompt(BasePrompt):
         self.control_c_sequence = [3]
         self.tab_sequence = [9]
         self.double_escape_sequence = [27, 27]
+
+    def show_prompt(self):
+        self.on_prompt_output('', 0)
 
     def on_prompt_output(self, message = None, cursor_index = -1):
         if message != None:
@@ -42,4 +46,8 @@ class TerminalPrompt(BasePrompt):
         stdout.write(message)
         if prompt:
             stdout.write('\n')
-            self.on_prompt_output('', 0)
+            self.show_prompt()
+
+    def on_error(self, message):
+        stdout.write('%sError: %s%s\n' % (self.ERROR_COLOR, message, self.DEFAULT_COLOR))
+        self.show_prompt()

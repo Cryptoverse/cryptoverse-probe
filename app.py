@@ -2,7 +2,7 @@ from datetime import datetime
 from callback_service import CallbackService
 from command_service import CommandService
 
-class App():
+class App(object):
 
     def __init__(self):
         self.callbacks = CallbackService()

@@ -13,11 +13,6 @@ class TerminalPrompt(BasePrompt):
 
     def __init__(self, app):
         super(TerminalPrompt, self).__init__(app)
-        self.app.callbacks.prompt_output += self.on_prompt_output
-        self.app.callbacks.enter_command += self.on_any_command
-        self.app.callbacks.undefined_command += self.on_any_command
-        self.app.callbacks.output += self.on_output
-        self.app.callbacks.error += self.on_error
 
     def define_sequences(self):
         self.return_sequence = [13]

@@ -8,6 +8,11 @@ class BasePrompt(object):
         self.define_sequences()
         self.define_special_sequences()
 
+        self.app.callbacks.prompt_output += self.on_prompt_output
+        self.app.callbacks.enter_command += self.on_any_command
+        self.app.callbacks.undefined_command += self.on_any_command
+        self.app.callbacks.output += self.on_output
+        self.app.callbacks.error += self.on_error
         self.app.callbacks.update += self.on_update
 
 
@@ -34,11 +39,6 @@ class BasePrompt(object):
             self.control_c_sequence,
             self.double_escape_sequence
         ]
-
-    def on_update(self, delta):
-        result = self.poll_input()
-        if result.has_input():
-            self.app.callbacks.on_input(result)
 
     def poll_input(self):
         alpha_numeric_range = range(32, 127)
@@ -87,6 +87,23 @@ class BasePrompt(object):
             print 'Unrecognized alphanumeric sequence %s' % chars
         
         return result
+
+    def on_update(self, delta):
+        result = self.poll_input()
+        if result.has_input():
+            self.app.callbacks.on_input(result)
+
+    def on_prompt_output(self, message = None, cursor_index = -1):
+        raise NotImplementedError
+
+    def on_any_command(self, *args):
+        raise NotImplementedError
+
+    def on_output(self, message = None, prompt = True):
+        raise NotImplementedError
+
+    def on_error(self, message):
+        raise NotImplementedError
 
 class PollResult(object):
 

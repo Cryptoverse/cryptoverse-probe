@@ -1,4 +1,4 @@
-import traceback
+from traceback import print_exc
 from app import App
 
 def run():
@@ -9,6 +9,6 @@ if __name__ == '__main__':
     try:
         run()
     except:
-        traceback.print_exc()
+        print_exc()
         print ''
         raw_input("Press enter to quit...")

@@ -1,4 +1,6 @@
 from commands import ALL_COMMANDS
+from models.command_history_model import CommandHistoryModel
+from util import get_time
 
 class CommandService(object):
     
@@ -8,6 +10,7 @@ class CommandService(object):
         self.command_index = 0
         self.command_history = -1
         self.command_in_session = 0
+        self.command_count = 0
 
         self.app.callbacks.input += self.on_input
 
@@ -17,6 +20,8 @@ class CommandService(object):
             command_instance = current_command(app)
             self.commands.append(command_instance)
             self.command_names.append(command_instance.name)
+
+        self.count_commands()
 
     def on_input(self, poll_result):
 
@@ -44,14 +49,14 @@ class CommandService(object):
             return
         elif poll_result.is_up:
             self.command_history = min(self.command_history + 1, self.count_commands() - 1)
-            self.command = self.get_from_history(self.command_history)
+            self.set_from_history(self.command_history)
             self.command_index = 0 if self.command is None else len(self.command)
         elif poll_result.is_down:
             self.command_history = max(self.command_history - 1, -1)
             if self.command_history < 0:
                 self.command = ''
             else:
-                self.command = self.get_from_history(self.command_history)
+                self.set_from_history(self.command_history)
             self.command_index = 0 if self.command is None else len(self.command)
         elif poll_result.is_left:
             if 0 < self.command_index:
@@ -120,12 +125,27 @@ class CommandService(object):
         return next(command for command in self.commands if command.name == name)
 
     # Database functionality...
-    def get_from_history(self, index):
-        return 'Not impl'
+    def set_from_history(self, index):
+        self.app.database.find_command_history(index, self.on_set_from_history)
+
+    def on_set_from_history(self, result):
+        if result.is_error:
+            raise Exception(result.content)
+        self.command = result.content
 
     def add_to_history(self, command):
-        # TODO: Add command to history, if not already in it
-        pass
+        entry = CommandHistoryModel()
+        entry.command = command
+        entry.time = get_time()
+        entry.session_order = self.command_in_session
+        self.command_in_session += 1
+        self.app.database.write(entry)
 
     def count_commands(self):
-        return 0
+        self.app.database.count(CommandHistoryModel, self.on_count_commands)
+        return self.command_count
+
+    def on_count_commands(self, result):
+        if result.is_error:
+            raise Exception(result.content)
+        self.command_count = result.content

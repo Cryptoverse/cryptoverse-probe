@@ -1,33 +1,60 @@
+from database_services.database_result import DatabaseResult
+
 class BaseDatabase(object):
 
-    def __init__(self, app):
+    def __init__(self, app, database_handlers):
         self.app = app
+        self.database_handlers = database_handlers
+        self.uninitialized_handlers = database_handlers
+        self.on_initialized = None
+        self.rebuild = False
 
-    def initialize(self, done):
-        raise NotImplementedError
+    def initialize(self, done, rebuild=False):
+        self.rebuild = rebuild
+        if done is None:
+            raise TypeError('"done" cannot be None')
+        self.on_initialized = done
+        if self.database_handlers is None:
+            self.on_initialized(DatabaseResult('No database handlers', False))
+            return
+        self.on_handler_initialized()
+
+    def on_handler_initialized(self, result=None):
+        if result is not None and result.is_error:
+            self.on_initialized(result)
+            return
+        if not self.uninitialized_handlers:
+            self.on_initialized(DatabaseResult('All handlers initialized'))
+            return
+        current = self.uninitialized_handlers[0]
+        self.uninitialized_handlers = self.uninitialized_handlers[1:]
+        current.initialize(self.on_handler_initialized, self.rebuild)
 
     # General functionality
 
-    def create(self, model_type, done):
-        raise NotImplementedError
+    def get_handler(self, model_type):
+        handler = next(handler for handler in self.database_handlers if handler.model_type == model_type)
+        if not handler:
+            raise Exception('Database handler for model type "%s" not found' % model_type)
+        return handler
 
-    def drop(self, model, done):
-        raise NotImplementedError
+    def write(self, model, done=None):
+        self.get_handler(type(model)).write(model, done)
 
     def read(self, model_type, model_id, done):
-        raise NotImplementedError
+        self.get_handler(model_type).read(model_id, done)
 
-    def read_all(self, model_type, ids, done):
-        raise NotImplementedError
+    def read_all(self, model_type, model_ids, done):
+        self.get_handler(model_type).read_all(model_ids, done)
 
-    def write(self, model, done):
-        raise NotImplementedError
+    def drop(self, model, done):
+        self.get_handler(type(model)).drop(model, done)
 
     def sync(self, model, done):
-        raise NotImplementedError
+        self.get_handler(type(model)).sync(model, done)
 
     def count(self, model_type, done):
-        raise NotImplementedError
+        self.get_handler(model_type).count(done)
 
     # Optimizable functionality
 
@@ -64,7 +91,7 @@ class BaseDatabase(object):
     def find_blocks_share_chain(self, block_hashes, done):
         raise NotImplementedError
 
-    def find_unused_events(self, done, from_block_hash=None, from_system=None, from_fleet=None)
+    def find_unused_events(self, done, from_block_hash=None, from_system=None, from_fleet=None):
         raise NotImplementedError
 
     def find_fleets(self, from_block_hash, done):
@@ -75,4 +102,3 @@ class BaseDatabase(object):
 
     def any_events_used(self, events, done, from_block_hash=None):
         raise NotImplementedError
-    

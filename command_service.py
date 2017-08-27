@@ -11,6 +11,7 @@ class CommandService(object):
         self.command_history = -1
         self.command_in_session = 0
         self.command_count = 0
+        self.command_last = None
 
         self.app.callbacks.input += self.on_input
 
@@ -22,6 +23,7 @@ class CommandService(object):
             self.command_names.append(command_instance.name)
 
         self.count_commands()
+        self.app.database.find_command_history(0, self.on_set_last_from_history)
 
     def on_input(self, poll_result):
 
@@ -88,7 +90,8 @@ class CommandService(object):
             if command_name is None:
                 return
 
-            self.add_to_history(self.command)
+            if self.command != self.command_last:
+                self.add_to_history(self.command)
             
             if command_name in self.command_names:
                 self.app.callbacks.on_enter_command(command_name, *command_parameters)
@@ -124,14 +127,18 @@ class CommandService(object):
     def get_command(self, name):
         return next(command for command in self.commands if command.name == name)
 
-    # Database functionality...
     def set_from_history(self, index):
         self.app.database.find_command_history(index, self.on_set_from_history)
 
     def on_set_from_history(self, result):
         if result.is_error:
             raise Exception(result.content)
-        self.command = result.content
+        self.command = result.content.command if result.content else None
+
+    def on_set_last_from_history(self, result):
+        if result.is_error:
+            raise Exception(result.content)
+        self.command_last = result.content.command if result.content else None
 
     def add_to_history(self, command):
         entry = CommandHistoryModel()
@@ -139,6 +146,7 @@ class CommandService(object):
         entry.time = get_time()
         entry.session_order = self.command_in_session
         self.command_in_session += 1
+        self.command_last = command
         self.app.database.write(entry)
 
     def count_commands(self):

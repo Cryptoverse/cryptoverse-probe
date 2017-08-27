@@ -26,7 +26,7 @@ class CommandHistorySqlite(BaseSqliteHandler):
             if model.id is None:
                 cursor.execute('INSERT INTO command_history VALUES (?, ?, ?)', (model.command, model.time, model.session_order))
             else:
-                cursor.execute('UPDATE command_history SET command=?, time=?, session_order=? WHERE id=?', (model.command, model.time, model.session_order))
+                cursor.execute('UPDATE command_history SET command=?, time=?, session_order=? WHERE rowid=?', (model.command, model.time, model.session_order))
             
 
             # if command_history_limit() <= count_commands():
@@ -62,7 +62,15 @@ class CommandHistorySqlite(BaseSqliteHandler):
     def find_command_history(self, index, done):
         connection, cursor = self.begin()
         try:
-            result = cursor.execute('SELECT command FROM command_history ORDER BY time DESC, session_order DESC LIMIT 1 OFFSET ?', (index,)).fetchone()
-            done(DatabaseResult(result[0] if result else None))
+            result = cursor.execute('SELECT rowid, command, time, session_order FROM command_history ORDER BY time DESC, session_order DESC LIMIT 1 OFFSET ?', (index,)).fetchone()
+            if result:
+                model = CommandHistoryModel()
+                model.id = result[0]
+                model.command = result[1]
+                model.time = result[2]
+                model.session_order = result[3]
+                done(DatabaseResult(model))
+            else:
+                done(DatabaseResult(None))
         finally:
             connection.close()

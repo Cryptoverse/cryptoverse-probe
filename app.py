@@ -27,7 +27,12 @@ class App(object):
             raise Exception('Linux is not currently supported')
 
     def begin(self):
-        self.database.initialize(self.on_initialized)
+        self.database.initialize(self.on_database_initialized)
+
+    def on_database_initialized(self, result):
+        if result.is_error:
+            raise Exception(result.content if result.content is not None else 'Initialization failed')
+        self.commands.initialize(self.on_initialized)
 
     def on_initialized(self, result):
         if result.is_error:

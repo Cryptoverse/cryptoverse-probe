@@ -1,4 +1,5 @@
 from commands import ALL_COMMANDS
+from callback_result import CallbackResult
 from models.command_history_model import CommandHistoryModel
 from util import get_time
 
@@ -22,8 +23,30 @@ class CommandService(object):
             self.commands.append(command_instance)
             self.command_names.append(command_instance.name)
 
-        self.count_commands()
-        self.app.database.find_command_history(0, self.on_set_last_from_history)
+    # Initialization Begin
+
+    def initialize(self, done):
+        self.initialize_last_command(done)
+
+    def initialize_last_command(self, done):
+        def on_result(result):
+            if result.is_error:
+                done(result)
+            else:
+                self.command_last = result.content.command if result.content else None
+                self.initialize_command_count(done)
+        self.app.database.find_command_history(0, on_result)
+
+    def initialize_command_count(self, done):
+        def on_result(result):
+            if result.is_error:
+                done(result)
+            else:
+                self.command_count = result.content
+                done(CallbackResult())
+        self.app.database.count(CommandHistoryModel, on_result)
+        
+    # Initialization End
 
     def on_input(self, poll_result):
 
@@ -134,11 +157,6 @@ class CommandService(object):
         if result.is_error:
             raise Exception(result.content)
         self.command = result.content.command if result.content else None
-
-    def on_set_last_from_history(self, result):
-        if result.is_error:
-            raise Exception(result.content)
-        self.command_last = result.content.command if result.content else None
 
     def add_to_history(self, command):
         entry = CommandHistoryModel()

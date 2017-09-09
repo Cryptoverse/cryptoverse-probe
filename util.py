@@ -524,6 +524,8 @@ def get_fleet_hash_name(stripped_public_key, length=6):
     Returns:
         str: The shortened name.
     """
+    if (stripped_public_key is None):
+        return '(No Name)'
     return get_fleet_name(sha256(stripped_public_key), length)
 
 

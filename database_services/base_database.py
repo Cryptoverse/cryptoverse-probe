@@ -1,4 +1,4 @@
-from database_services.database_result import DatabaseResult
+from callback_result import CallbackResult
 
 class BaseDatabase(object):
 
@@ -15,7 +15,7 @@ class BaseDatabase(object):
             raise TypeError('"done" cannot be None')
         self.on_initialized = done
         if self.database_handlers is None:
-            self.on_initialized(DatabaseResult('No database handlers', False))
+            self.on_initialized(CallbackResult('No database handlers', False))
             return
         self.on_handler_initialized()
 
@@ -24,7 +24,7 @@ class BaseDatabase(object):
             self.on_initialized(result)
             return
         if not self.uninitialized_handlers:
-            self.on_initialized(DatabaseResult('All handlers initialized'))
+            self.on_initialized(CallbackResult('All handlers initialized'))
             return
         current = self.uninitialized_handlers[0]
         self.uninitialized_handlers = self.uninitialized_handlers[1:]
@@ -62,6 +62,9 @@ class BaseDatabase(object):
         raise NotImplementedError
 
     def find_account(self, name, done):
+        raise NotImplementedError
+
+    def find_account_active(self, done):
         raise NotImplementedError
 
     def find_block_latest(self, done):

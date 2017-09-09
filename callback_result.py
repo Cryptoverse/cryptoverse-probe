@@ -1,4 +1,4 @@
-class DatabaseResult(object):
+class CallbackResult(object):
 
     GENERIC_ERROR = 'Something went wrong'
 

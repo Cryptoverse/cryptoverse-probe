@@ -8,7 +8,8 @@ class HelpCommand(BaseCommand):
             'help',
             description = 'This help message',
             parameter_usages = [
-                '"help <command>" to list command details'
+                'None: List all commands'
+                '"help <command>" to retrieve command details'
             ]
         )
 

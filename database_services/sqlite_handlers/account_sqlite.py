@@ -58,7 +58,12 @@ class AccountSqlite(BaseSqliteHandler):
     def read_all(self, model_ids, done):
         connection, cursor = self.begin()
         try:
-            results = cursor.execute('SELECT rowid, * FROM accounts WHERE rowid IN ?', (self.concat_list(model_ids),)).fetchall()
+            if model_ids is None:
+                query = cursor.execute('SELECT rowid, * FROM accounts')
+            else:
+                query = cursor.execute('SELECT rowid, * FROM accounts WHERE rowid IN ?', (self.concat_list(model_ids),))
+            
+            results = query.fetchall()
             if results:
                 models = []
                 for result in results:
@@ -116,7 +121,6 @@ class AccountSqlite(BaseSqliteHandler):
         connection, cursor = self.begin()
         try:
             result = cursor.execute('SELECT rowid, * FROM accounts WHERE active=?', (1,)).fetchone()
-            print result
             if result:
                 model = AccountModel()
                 model.id = result[0]

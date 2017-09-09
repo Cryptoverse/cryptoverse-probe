@@ -52,12 +52,38 @@ class AccountCommand(BaseCommand):
         self.app.callbacks.on_output(message)
 
     def on_list_accounts(self):
-        pass
+        def on_read_all(read_all_result):
+            if read_all_result.is_error:
+                self.app.callbacks.on_error('Error reading accounts: %s' % read_all_result.content)
+            elif read_all_result.content is None or len(read_all_result.content) == 0:
+                self.app.callbacks.on_error('No accounts to list')
+            else:
+                message = 'All Accounts\n'
+                for account in read_all_result.content:
+                    current_entry = '%s\t - %s\n' % ('[CURR]' if account.active else '', account.name)
+                    current_entry += '\t\tFleet Hash: %s\n' % account.get_fleet_name()
+                    message += current_entry
+                self.app.callbacks.on_output(message)
+
+        self.app.database.account.read_all(None, on_read_all)
 
     def on_set_account_active(self, name):
-        pass
+        def on_find(find_result):
+            if find_result.is_error:
+                self.app.callbacks.on_error('Unable to find account "%s"' % name)
+            else:
+                model = find_result.content
+                model.active = True
 
-    # Create Account Begin
+                def on_write(write_result):
+                    if write_result.is_error:
+                        self.app.callbacks.on_error('Error writing account: %s' % write_result.content)
+                    else:
+                        self.app.callbacks.on_output('Account "%s" is now active' % name)
+
+                self.app.database.account.write(model, on_write)
+
+        self.app.database.account.find_account(name, on_find)
 
     def on_create_account(self, name):
         def on_check_name(name_result):
@@ -76,29 +102,21 @@ class AccountCommand(BaseCommand):
                     encoding=serialization.Encoding.PEM,
                     format=serialization.PublicFormat.SubjectPublicKeyInfo
                 )
-                # public_lines = public_serialized.splitlines()
-                # public_shrunk = ''
-                # for line in range(1, len(public_lines) - 1):
-                #     public_shrunk += public_lines[line].strip('\n')
-                
+
                 model = AccountModel()
                 model.active = True
                 model.name = name
                 model.private_key = private_serialized
                 model.public_key = public_serialized
 
-                def on_save(save_result):
-                    if save_result.is_error:
-                        self.app.callbacks.on_error('Error saving account: %s' % save_result.content)
+                def on_write(write_result):
+                    if write_result.is_error:
+                        self.app.callbacks.on_error('Error writing account: %s' % write_result.content)
                     else:
                         self.app.callbacks.on_output('Succesfully created account "%s"' % name)
 
-                self.app.database.account.write(model, on_save)
+                self.app.database.account.write(model, on_write)
             else:
                 self.app.callbacks.on_error('An account with the name "%s" already exists' % name)
-        
+
         self.app.database.account.find_account(name, on_check_name)
-
-
-
-    # Create Account End

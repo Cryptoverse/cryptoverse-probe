@@ -5,18 +5,16 @@ from models.account_model import AccountModel
 class AccountSqlite(BaseSqliteHandler):
 
     def __init__(self):
-        super(AccountSqlite, self).__init__(AccountModel)
-
-    def initialize(self, done, rebuild=False):
-        connection, cursor = self.begin()
-        try:
-            if rebuild:
-                cursor.execute('''DROP TABLE IF EXISTS accounts''')
-            cursor.execute('''CREATE TABLE IF NOT EXISTS accounts (active, name, private_key, public_key)''')
-            connection.commit()
-        finally:
-            connection.close()
-        done(CallbackResult())
+        super(AccountSqlite, self).__init__(
+            AccountModel,
+            'accounts',
+            [
+                'active',
+                'name',
+                'private_key',
+                'public_key'
+            ]
+        )
 
     # General functionality
 
@@ -88,16 +86,6 @@ class AccountSqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
-    def sync(self, model, done):
-        raise NotImplementedError
-
-    def count(self, done):
-        connection, cursor = self.begin()
-        try:
-            done(CallbackResult(self.locked_count(cursor)))
-        finally:
-            connection.close()
-
     # Optimized functionality
 
     def find_account(self, name, done):
@@ -135,9 +123,6 @@ class AccountSqlite(BaseSqliteHandler):
             connection.close()
 
     # Shared
-
-    def locked_count(self, cursor):
-        return cursor.execute('SELECT COUNT(*) FROM accounts').fetchone()[0]
 
     def locked_confirm_active(self, model, cursor):
         if model.id is None or not model.active:

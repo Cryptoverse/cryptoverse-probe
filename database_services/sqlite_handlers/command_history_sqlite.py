@@ -7,18 +7,15 @@ class CommandHistorySqlite(BaseSqliteHandler):
     COMMAND_HISTORY_LIMIT = 100
 
     def __init__(self):
-        super(CommandHistorySqlite, self).__init__(CommandHistoryModel)
-
-    def initialize(self, done, rebuild=False):
-        connection, cursor = self.begin()
-        try:
-            if rebuild:
-                cursor.execute('''DROP TABLE IF EXISTS command_history''')
-            cursor.execute('''CREATE TABLE IF NOT EXISTS command_history (command, time, session_order)''')
-            connection.commit()
-        finally:
-            connection.close()
-        done(CallbackResult())
+        super(CommandHistorySqlite, self).__init__(
+            CommandHistoryModel,
+            'command_history',
+            [
+                'command',
+                'time',
+                'session_order'
+            ]
+        )
 
     # General functionality
 
@@ -41,25 +38,6 @@ class CommandHistorySqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
-    def read(self, model_id, done):
-        raise NotImplementedError
-
-    def read_all(self, model_ids, done):
-        raise NotImplementedError
-
-    def drop(self, model, done=None):
-        raise NotImplementedError
-
-    def sync(self, model, done):
-        raise NotImplementedError
-
-    def count(self, done):
-        connection, cursor = self.begin()
-        try:
-            done(CallbackResult(self.locked_count(cursor)))
-        finally:
-            connection.close()
-
     # Optimized functionality
 
     def find_command_history(self, index, done):
@@ -77,8 +55,3 @@ class CommandHistorySqlite(BaseSqliteHandler):
                 done(CallbackResult(None))
         finally:
             connection.close()
-
-    # Shared
-
-    def locked_count(self, cursor):
-        return cursor.execute('SELECT COUNT(*) FROM command_history').fetchone()[0]

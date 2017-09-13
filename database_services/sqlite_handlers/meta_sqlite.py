@@ -5,18 +5,13 @@ from models.meta_model import MetaModel
 class MetaSqlite(BaseSqliteHandler):
 
     def __init__(self):
-        super(MetaSqlite, self).__init__(MetaModel)
-
-    def initialize(self, done, rebuild=False):
-        connection, cursor = self.begin()
-        try:
-            if rebuild:
-                cursor.execute('''DROP TABLE IF EXISTS meta''')
-            cursor.execute('''CREATE TABLE IF NOT EXISTS meta (text_content)''')
-            connection.commit()
-        finally:
-            connection.close()
-        done(CallbackResult())
+        super(MetaSqlite, self).__init__(
+            MetaModel,
+            'meta',
+            [
+                'text_content'
+            ]
+        )
 
     # General functionality
 

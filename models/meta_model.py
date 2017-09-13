@@ -1,5 +1,4 @@
 from models.base_model import BaseModel
-import util
 
 class MetaModel(BaseModel):
 

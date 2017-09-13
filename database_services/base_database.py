@@ -105,3 +105,6 @@ class BaseDatabase(object):
 
     def any_events_used(self, events, done, from_block_hash=None):
         raise NotImplementedError
+
+    def find_recent_nodes(self, done):
+        raise NotImplementedError

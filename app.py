@@ -2,6 +2,7 @@ from sys import platform
 from datetime import datetime
 from callback_service import CallbackService
 from command_service import CommandService
+from remote_services.web_remote import WebRemote
 
 class App(object):
 
@@ -15,6 +16,7 @@ class App(object):
         self.database = platform_database(self)
         self.prompt = platform_prompt(self)
         self.commands = CommandService(self)
+        self.remote = WebRemote(self)
 
     def get_platform_services(self):
         if platform == 'darwin':
@@ -32,7 +34,18 @@ class App(object):
     def on_database_initialized(self, result):
         if result.is_error:
             raise Exception(result.content if result.content is not None else 'Initialization failed')
-        self.commands.initialize(self.on_initialized)
+        self.commands.initialize(self.on_commands_initialized)
+
+    def on_commands_initialized(self, result):
+        if result.is_error:
+            raise Exception(result.content if result.content is not None else 'Initialization failed')
+        self.remote.initialize(self.on_remote_initialized)
+
+    def on_remote_initialized(self, result):
+        if result.is_error:
+            raise Exception(result.content if result.content is not None else 'Initialization failed')
+        print 'todo: add command "nodes -a <url here>" okay????'
+        self.on_initialized(result)
 
     def on_initialized(self, result):
         if result.is_error:

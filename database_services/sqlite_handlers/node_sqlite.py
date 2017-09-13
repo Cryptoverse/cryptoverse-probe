@@ -67,6 +67,18 @@ class NodeSqlite(BaseSqliteHandler):
 
     # Optimized functionality
 
+    def find_recent_nodes(self, done):
+        connection, cursor = self.begin()
+        try:
+            results = cursor.execute('SELECT rowid, * FROM nodes WHERE blacklisted=? ORDER BY last_response_datetime DESC', (0,)).fetchall()
+            models = []
+            if results:
+                for result in results:
+                    models.append(self.model_from_request(result))
+            done(CallbackResult(models))
+        finally:
+            connection.close()
+
     # Utility
 
     def model_from_request(self, result):

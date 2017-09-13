@@ -31,3 +31,6 @@ class SqliteDatabase(BaseDatabase):
 
     def find_account_active(self, done):
         self.account.find_account_active(done)
+
+    def find_recent_nodes(self, done):
+        self.node.find_recent_nodes(done)

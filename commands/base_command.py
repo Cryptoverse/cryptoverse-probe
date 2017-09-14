@@ -7,6 +7,7 @@ class BaseCommand(object):
         self.name = name
         self.description = kwargs.get('description', 'No description provided')
         self.parameter_usages = kwargs.get('parameter_usages', [])
+        self.command_handlers = kwargs.get('command_handlers', [])
 
         self.app.callbacks.enter_command += self.on_enter_command
 
@@ -26,4 +27,22 @@ class BaseCommand(object):
                 self.app.callbacks.on_error('Command "%s" raised an exception' % self.name)
 
     def on_command(self, *args):
-        raise NotImplementedError
+        if self.command_handlers is None or len(self.command_handlers) == 0:
+            raise NotImplementedError
+        
+        parameter_count = len(args)
+        if parameter_count == 0:
+            handler = next((h for h in self.command_handlers if (h[0] is None and h[2] == 0)), None)
+            if handler is None:
+                self.app.callbacks.on_error('Command "%s" does not have a parameterless functionality' % self.name)
+                return
+            handler[1]()
+            return
+        handler = next((h for h in self.command_handlers if (h[0] == args[0] and h[2] == (parameter_count - 1))), None)
+        if handler is None:
+            self.app.callbacks.on_error('Command "%s" does not have a parameter "%s" that takes %s options' % (self.name, args[0], parameter_count - 1))
+            return
+        handler[1](*args[1:])
+
+    def get_handler(self, name, handler, parameter_count = 0):
+        return (name, handler, parameter_count)

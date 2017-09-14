@@ -79,7 +79,7 @@ class RulesSqlite(BaseSqliteHandler):
                 model = self.model_from_request(result)
                 done(CallbackResult(model))
             else:
-                done(CallbackResult('No rules found', False))
+                done(CallbackResult(None))
         finally:
             connection.close()
 
@@ -97,3 +97,4 @@ class RulesSqlite(BaseSqliteHandler):
         model.difficulty_duration = result[7]
         model.cartesian_digits = result[8]
         model.probe_reward = result[9]
+        return model

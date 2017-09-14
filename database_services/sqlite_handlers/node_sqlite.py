@@ -57,6 +57,24 @@ class NodeSqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
+    def read_all(self, model_ids, done):
+        connection, cursor = self.begin()
+        try:
+            if model_ids is None:
+                query = cursor.execute('SELECT rowid, * FROM nodes')
+            else:
+                query = cursor.execute('SELECT rowid, * FROM nodes WHERE rowid IN ?', (self.concat_list(model_ids),))
+            
+            results = query.fetchall()
+            models = []
+            if results:
+                for result in results:
+                    models.append(self.model_from_request(result))
+            done(CallbackResult(models))
+        finally:
+            connection.close()
+
+
     def drop(self, model, done=None):
         connection, cursor = self.begin()
         try:
@@ -91,3 +109,4 @@ class NodeSqlite(BaseSqliteHandler):
         model.blocks_limit_max = result[5]
         model.blacklisted = result[6] == 1
         model.blacklist_reason = result[7]
+        return model

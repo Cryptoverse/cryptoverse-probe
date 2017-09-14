@@ -3,6 +3,7 @@ import requests
 from callback_result import CallbackResult
 from remote_services.base_remote import BaseRemote
 from models.rules_model import RulesModel
+from models.node_limits_model import NodeLimitsModel
 
 class WebRemote(BaseRemote):
 
@@ -11,21 +12,26 @@ class WebRemote(BaseRemote):
         if result.is_error:
             done(result)
             return
-        model = RulesModel()
+        rules = RulesModel()
+        limits = NodeLimitsModel()
         try:
-            model.jump_cost_min = result['jump_cost_min']
-            model.jump_cost_max = result['jump_cost_max']
-            model.jump_distance_max = result['jump_distance_max']
-            model.difficulty_fudge = result['difficulty_fudge']
-            model.difficulty_start = result['difficulty_start']
-            model.difficulty_interval = result['difficulty_interval']
-            model.difficulty_duration = result['difficulty_duration']
-            model.cartesian_digits = result['cartesian_digits']
-            model.probe_reward = result['probe_reward']
+            json = result.content
+            rules.jump_cost_min = json['jump_cost_min']
+            rules.jump_cost_max = json['jump_cost_max']
+            rules.jump_distance_max = json['jump_distance_max']
+            rules.difficulty_fudge = json['difficulty_fudge']
+            rules.difficulty_start = json['difficulty_start']
+            rules.difficulty_interval = json['difficulty_interval']
+            rules.difficulty_duration = json['difficulty_duration']
+            rules.cartesian_digits = json['cartesian_digits']
+            rules.probe_reward = json['probe_reward']
+
+            limits.blocks_limit_max = json['blocks_limit_max']
+            limits.events_limit_max = json['events_limit_max']
         except:
             done(CallbackResult('Parsing error on rules result', False))
             return
-        done(CallbackResult(model))
+        done(CallbackResult((rules,limits)))
 
     def get_request(self, url, payload=None, verbose=False):
         try:

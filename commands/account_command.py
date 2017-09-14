@@ -16,27 +16,15 @@ class AccountCommand(BaseCommand):
                 '"-l" list all accounts stored in persistent data',
                 '"-s <account name>" sets the specified account as acitve',
                 '"-c <account name>" creates an account with the specified name'
+            ],
+            command_handlers = [
+                self.get_handler(None, self.on_current_account),
+                self.get_handler('-l', self.on_list_accounts),
+                self.get_handler('-s', self.on_set_account_active, 1),
+                self.get_handler('-c', self.on_create_account, 1)
             ]
         )
 
-    def on_command(self, *args):
-        parameter_count = len(args)
-        if parameter_count == 0:
-            self.on_current_account()
-        elif args[0] == '-l':
-            self.on_list_accounts()
-        elif args[0] == '-s':
-            if parameter_count == 2:
-                self.on_set_account_active(args[1])
-            else:
-                raise ValueError('Invalid number of parameters for "-s"')
-        elif args[0] == '-c':
-            if parameter_count == 2:
-                self.on_create_account(args[1])
-            else:
-                raise ValueError('Invalid number of parameters for "-c"')
-        else:
-            self.app.callbacks.on_error('Command "account" does not recognize parameter "%s"' % args[0])
     # Events
 
     def on_current_account(self):

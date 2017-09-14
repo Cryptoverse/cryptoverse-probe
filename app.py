@@ -44,13 +44,13 @@ class App(object):
     def on_remote_initialized(self, result):
         if result.is_error:
             raise Exception(result.content if result.content is not None else 'Initialization failed')
-        print 'todo: add command "nodes -a <url here>" okay????'
+        print result.content
+        print 'currently the local node is blacklisted, add the ability to reping it to activate it in the node command'
         self.on_initialized(result)
 
     def on_initialized(self, result):
         if result.is_error:
             raise Exception(result.content if result.content is not None else 'Initialization failed')
-
         last_update = datetime.now()
         while not self.exited:
             now = datetime.now()

@@ -12,23 +12,13 @@ class MetaCommand(BaseCommand):
                 'None: Retrieves the current meta content being included with probed blocks',
                 '"-s <text>" sets a new meta content',
                 '"-r" resets the meta content to nothing'
+            ],
+            command_handlers = [
+                self.get_handler(None, self.on_current_meta),
+                self.get_handler('-s', self.on_set_meta_text, 1),
+                self.get_handler('-r', self.on_reset_meta)
             ]
         )
-
-    def on_command(self, *args):
-        parameter_count = len(args)
-        if parameter_count == 0:
-            self.on_current_meta()
-        elif args[0] == '-s':
-            if parameter_count == 2:
-                self.on_set_meta_text(args[1])
-            else:
-                raise ValueError('Invalid number of parameters for "-s"')
-        elif args[0] == '-r':
-            self.on_reset_meta()
-        else:
-            self.app.callbacks.on_error('Command "meta" does not recognize parameter "%s"' % args[0])
-    # Events
 
     def on_current_meta(self):
         def on_find(find_result):

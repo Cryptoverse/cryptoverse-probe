@@ -5,6 +5,9 @@ class BaseModel(object):
     def __init__(self):
         self.id = None
 
+    def __str__(self):
+        return self.get_pretty()
+
     def get_pretty_entry(self, field, value, indent = 1):
         indents = '\t' * indent
         return '%s%s : %s\n' % (indents, field, value)

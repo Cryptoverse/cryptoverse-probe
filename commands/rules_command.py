@@ -1,5 +1,4 @@
 from commands.base_command import BaseCommand
-from models.rules_model import RulesModel
 
 class RulesCommand(BaseCommand):
 

@@ -1,4 +1,5 @@
 from commands.base_command import BaseCommand
+from sync_command import SyncCommand
 
 class ProbeCommand(BaseCommand):
 
@@ -18,4 +19,9 @@ class ProbeCommand(BaseCommand):
         )
 
     def on_probe(self):
-        raise NotImplementedError
+        def on_sync(sync_result):
+            if sync_result.is_error:
+                self.app.callbacks.on_error(sync_result.content)
+                return
+            
+        self.app.commands.get_command(SyncCommand.COMMAND_NAME).synchronize(on_sync)

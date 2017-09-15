@@ -5,7 +5,8 @@ from commands import (
     account_command,
     meta_command,
     nodes_command,
-    rules_command
+    rules_command,
+    probe_command
 )
 
 ALL_COMMANDS = [
@@ -15,5 +16,6 @@ ALL_COMMANDS = [
     account_command.AccountCommand,
     meta_command.MetaCommand,
     nodes_command.NodesCommand,
-    rules_command.RulesCommand
+    rules_command.RulesCommand,
+    probe_command.ProbeCommand
 ]

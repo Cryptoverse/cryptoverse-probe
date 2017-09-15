@@ -66,6 +66,8 @@ class RulesSqlite(BaseSqliteHandler):
         try:
             cursor.execute('DELETE FROM rules WHERE rowid=?', (model.id,))
             connection.commit()
+            if done:
+                done(CallbackResult())
         finally:
             connection.close()
 

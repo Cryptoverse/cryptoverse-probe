@@ -97,6 +97,28 @@ class NodeSqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
+    def find_by_url(self, url, done):
+        connection, cursor = self.begin()
+        try:
+            result = cursor.execute('SELECT rowid, * FROM nodes WHERE url=?', (url,)).fetchone()
+            if result:
+                done(CallbackResult(self.model_from_request(result)))
+            else:
+                done(CallbackResult('No node with url "%s" exists' % url, False))
+        finally:
+            connection.close()
+    
+    def find_by_id(self, model_id, done):
+        connection, cursor = self.begin()
+        try:
+            result = cursor.execute('SELECT rowid, * FROM nodes WHERE rowid=?', (model_id,)).fetchone()
+            if result:
+                done(CallbackResult(self.model_from_request(result)))
+            else:
+                done(CallbackResult('No node with id "%s" exists' % model_id, False))
+        finally:
+            connection.close()
+
     # Utility
 
     def model_from_request(self, result):

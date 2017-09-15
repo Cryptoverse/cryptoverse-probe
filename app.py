@@ -45,7 +45,6 @@ class App(object):
         if result.is_error:
             raise Exception(result.content if result.content is not None else 'Initialization failed')
         print result.content
-        print 'currently the local node is blacklisted, add the ability to reping it to activate it in the node command'
         self.on_initialized(result)
 
     def on_initialized(self, result):

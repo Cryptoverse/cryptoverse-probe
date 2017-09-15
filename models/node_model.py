@@ -12,6 +12,10 @@ class NodeModel(BaseModel):
         self.blacklisted = None
         self.blacklist_reason = None
 
+    def get_active(self):
+        return (self.last_response_datetime != 0 and 
+                self.last_request_datetime <= self.last_response_datetime)
+
     def get_pretty_content(self):
         content = super(NodeModel, self).get_pretty_content()
         content += self.get_pretty_entry('url', self.url)

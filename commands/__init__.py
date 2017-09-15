@@ -4,7 +4,7 @@ from commands import (
     info_command,
     account_command,
     meta_command,
-    node_command,
+    nodes_command,
     rules_command
 )
 
@@ -14,6 +14,6 @@ ALL_COMMANDS = [
     info_command.InfoCommand,
     account_command.AccountCommand,
     meta_command.MetaCommand,
-    node_command.NodeCommand,
+    nodes_command.NodesCommand,
     rules_command.RulesCommand
 ]

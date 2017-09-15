@@ -29,7 +29,6 @@ class BaseRemote(object):
                 return
             self.check_rules(find_rules_result.content, result.content)
         self.app.database.rules.find_rules(on_find_rules)
-        # self.on_initialized(CallbackResult('todo: lololol %s' % result.content))
 
     def check_rules(self, local_rules, remaining_nodes):
         current_node = remaining_nodes[0]
@@ -41,7 +40,6 @@ class BaseRemote(object):
         
         def on_get_rules(get_rules_result):
             if get_rules_result.is_error:
-                print 'did not get rules'
                 on_continue()
             else:
                 node_rules, node_limits = get_rules_result.content
@@ -64,8 +62,10 @@ class BaseRemote(object):
         self.get_rules(current_node, on_get_rules)
 
     def on_checked_rules(self):
-        print 'hahahaa?'
-        print self.node_success_count
+        if 0 < self.node_success_count:
+            self.on_initialized(CallbackResult('Remote services initialized, pinged %s nodes successfully' % self.node_success_count))
+        else:
+            self.on_initialized(CallbackResult('Remote services initialized, but no nodes could be synchronized'))
 
     def get_rules(self, node, done):
         raise NotImplementedError

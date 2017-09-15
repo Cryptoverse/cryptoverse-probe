@@ -2,10 +2,12 @@ from commands.base_command import BaseCommand
 
 class HelpCommand(BaseCommand):
 
+    COMMAND_NAME = 'help'
+
     def __init__(self, app):
         super(HelpCommand, self).__init__(
             app, 
-            'help',
+            self.COMMAND_NAME,
             description = 'This help message',
             parameter_usages = [
                 'None: List all commands'

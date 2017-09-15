@@ -3,10 +3,12 @@ from models.rules_model import RulesModel
 
 class RulesCommand(BaseCommand):
 
+    COMMAND_NAME = 'rules'
+
     def __init__(self, app):
         super(RulesCommand, self).__init__(
             app, 
-            'rules',
+            self.COMMAND_NAME,
             description = 'Retrieves the active ruleset',
             parameter_usages = [
                 'None: Retrieves the current rules',

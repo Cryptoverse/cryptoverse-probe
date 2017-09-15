@@ -5,10 +5,12 @@ import util
 
 class NodesCommand(BaseCommand):
 
+    COMMAND_NAME = 'nodes'
+
     def __init__(self, app):
         super(NodesCommand, self).__init__(
             app, 
-            'nodes',
+            self.COMMAND_NAME,
             description = 'Lists all cached nodes',
             parameter_usages = [
                 'None: Lists all active and inactive cached nodes',

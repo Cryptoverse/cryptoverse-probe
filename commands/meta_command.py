@@ -3,10 +3,12 @@ from models.meta_model import MetaModel
 
 class MetaCommand(BaseCommand):
 
+    COMMAND_NAME = 'meta'
+
     def __init__(self, app):
         super(MetaCommand, self).__init__(
             app, 
-            'meta',
+            self.COMMAND_NAME,
             description = 'Retrieves or sets the meta content included in probed blocks',
             parameter_usages = [
                 'None: Retrieves the current meta content being included with probed blocks',

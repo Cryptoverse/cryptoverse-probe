@@ -6,10 +6,12 @@ from models.account_model import AccountModel
 
 class AccountCommand(BaseCommand):
 
+    COMMAND_NAME = 'account'
+
     def __init__(self, app):
         super(AccountCommand, self).__init__(
             app, 
-            'account',
+            self.COMMAND_NAME,
             description = 'Information about local accounts',
             parameter_usages = [
                 'None: Retrieve the currently active account',

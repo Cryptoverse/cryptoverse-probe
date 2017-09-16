@@ -1,4 +1,4 @@
-class CallbackEvent():
+class CallbackEvent(object):
 
     def __init__(self):
         self.handlers = list()
@@ -14,9 +14,9 @@ class CallbackEvent():
             raise ValueError('Unable to find existing handler')
         return self
 
-    def call(self, *args, **kargs):
+    def call(self, *args, **kwargs):
         for handler in self.handlers:
-            handler(*args, **kargs)
+            handler(*args, **kwargs)
 
     def count(self):
         return len(self.handlers)

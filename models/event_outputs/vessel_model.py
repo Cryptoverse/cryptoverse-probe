@@ -2,10 +2,10 @@ from models.base_model import BaseModel
 
 class VesselModel(BaseModel):
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         super(VesselModel, self).__init__()
-        self.blueprint = None
-        self.modules = None
+        self.blueprint = kwargs.get('blueprint')
+        self.modules = kwargs.get('modules')
 
     def get_pretty_content(self):
         content = super(VesselModel, self).get_pretty_content()

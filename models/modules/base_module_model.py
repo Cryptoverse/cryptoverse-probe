@@ -2,13 +2,13 @@ from models.base_model import BaseModel
 
 class BaseModuleModel(BaseModel):
 
-    def __init__(self, module_type):
+    def __init__(self, **kwargs):
         super(BaseModuleModel, self).__init__()
-        self.blueprint = None
-        self.index = None
-        self.module_type = module_type
-        self.delta = None
-        self.health = None
+        self.blueprint = kwargs.get('blueprint', None)
+        self.index = kwargs.get('index', None)
+        self.module_type = kwargs.get('module_type', None)
+        self.delta = kwargs.get('delta', None)
+        self.health = kwargs.get('health', None)
         
 
     def get_pretty_content(self):

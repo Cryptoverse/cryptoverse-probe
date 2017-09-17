@@ -7,6 +7,11 @@ class EventInputModel(BaseModel):
         self.index = None
         self.key = None
 
+    def get_concat(self):
+        if self.key is None:
+            raise ValueError('key cannot be None')
+        return self.key
+
     def get_pretty_content(self):
         content = super(EventInputModel, self).get_pretty_content()
         content += self.get_pretty_entry('index', self.index)

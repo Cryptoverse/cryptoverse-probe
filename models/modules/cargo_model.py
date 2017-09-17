@@ -6,3 +6,10 @@ class CargoModel(BaseModuleModel):
         super(CargoModel, self).__init__(module_type = 'cargo', **kwargs)
         self.contents = kwargs.get('contents')
         self.mass_limit = kwargs.get('mass_limit')
+
+    def get_concat(self):
+        if self.contents is None:
+            raise ValueError('contents cannot be None')
+        result = super(CargoModel, self).get_concat()
+        result += self.contents.get_concat()
+        return result

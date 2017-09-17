@@ -1,4 +1,5 @@
 from models.base_model import BaseModel
+import util
 
 class EventModel(BaseModel):
 
@@ -11,6 +12,28 @@ class EventModel(BaseModel):
         self.inputs = None
         self.outputs = None
         self.signature = None
+
+    def get_concat(self):
+        if self.fleet is None:
+            raise ValueError('fleet cannot be None')
+        if self.fleet.public_key is None:
+            raise ValueError('fleet.public_key cannot be None')
+        if self.event_type is None:
+            raise ValueError('event_type cannot be None')
+        result = '%s%s%s' % (self.fleet.get_hash(), self.fleet.public_key, self.event_type)
+        for current_input in sorted(self.inputs, key=lambda x: x.index):
+            result += current_input.get_concat()
+        for current_output in sorted(self.outputs, key=lambda x: x.index):
+            result += current_output.get_concat()
+        return result
+
+    def generate_signature(self, private_key):
+        if self.fleet is None:
+            raise ValueError('fleet cannot be None')
+        if self.fleet.public_key is None:
+            raise ValueError('fleet.public_key cannot be None')
+        concat = self.get_concat()
+        self.signature = util.rsa_sign(private_key, concat)
 
     def get_pretty_content(self):
         content = super(EventModel, self).get_pretty_content()

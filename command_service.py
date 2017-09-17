@@ -148,7 +148,11 @@ class CommandService(object):
         return (name, parameters)
 
     def get_command(self, name):
-        return next(command for command in self.commands if command.name == name)
+        try:
+            return next(command for command in self.commands if command.name == name)
+        except StopIteration:
+            print 'Command "%s" cannot be found' % name
+            raise
 
     def set_from_history(self, index):
         self.app.database.find_command_history(index, self.on_set_from_history)

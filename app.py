@@ -2,6 +2,7 @@ from sys import platform
 from datetime import datetime
 from callback_service import CallbackService
 from command_service import CommandService
+from blueprint_service import BlueprintService
 from remote_services.web_remote import WebRemote
 
 class App(object):
@@ -16,6 +17,7 @@ class App(object):
         self.database = platform_database(self)
         self.prompt = platform_prompt(self)
         self.commands = CommandService(self)
+        self.blueprints = BlueprintService(self)
         self.remote = WebRemote(self)
 
     def get_platform_services(self):

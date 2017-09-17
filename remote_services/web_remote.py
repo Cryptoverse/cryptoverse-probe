@@ -8,6 +8,7 @@ from models.node_limits_model import NodeLimitsModel
 class WebRemote(BaseRemote):
 
     def get_rules(self, node, done):
+        # TODO: Thread this
         result = self.get_request('%s/rules' % node.url)
         if result.is_error:
             done(result)
@@ -32,6 +33,10 @@ class WebRemote(BaseRemote):
             done(CallbackResult('Parsing error on rules result', False))
             return
         done(CallbackResult((rules,limits)))
+
+    def get_events(self, node, done):
+        # TODO: All this
+        done(CallbackResult([]))
 
     def get_request(self, url, payload=None, verbose=False):
         try:

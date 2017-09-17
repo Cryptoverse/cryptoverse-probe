@@ -13,11 +13,14 @@ class BaseCommand(object):
 
     def on_enter_command(self, command, *args):
         if command == self.name:
+            has_stack_arg = '--stack' in args
+            if has_stack_arg: 
+                args = [arg for arg in args if arg != '--stack']
             try:
                 self.on_command(*args)
             except NotImplementedError:
                 message = 'Command "%s" is not implemented'
-                if '--stack' in args:
+                if has_stack_arg:
                     print_exc()
                 else:
                     message += ', include "--stack" for more information'

@@ -1,6 +1,12 @@
 from datetime import datetime
 from commands.base_command import BaseCommand
 from sync_command import SyncCommand
+from callback_result import CallbackResult
+from models.block_model import BlockModel
+from models.event_model import EventModel
+from models.event_output_model import EventOutputModel
+from models.event_outputs.vessel_model import VesselModel
+from models.fleet_model import FleetModel
 import util
 
 class ProbeCommand(BaseCommand):
@@ -25,10 +31,21 @@ class ProbeCommand(BaseCommand):
             if sync_result.is_error:
                 self.app.callbacks.on_error(sync_result.content)
                 return
-            generated = None
-            started = datetime.now()
-            while generated is None:
-                pass
+            def on_get_account(get_account_result):
+                if get_account_result.is_error:
+                    self.app.callbacks.on_error(get_account_result.content)
+                    return
+                if get_account_result.content is None:
+                    self.app.callbacks.on_error('No active account')
+                    return
+                self.create_block(get_account_result.content, None)
+            self.app.database.account.find_account_active(on_get_account)
+            
+
+            # generated = None
+            # started = datetime.now()
+            # while generated is None:
+            #     pass
                 # try:
                 #     generated = generate_next_star_log(from_hash, from_genesis, allow_duplicate_events, started)
                 # except ProbeTimeoutException:
@@ -36,62 +53,85 @@ class ProbeCommand(BaseCommand):
                 #         sync('-s')
         self.app.commands.get_command(SyncCommand.COMMAND_NAME).synchronize(on_sync)
 
-    def get_genesis(self):
-        # TODO: Turn this into a model
-        return {
-            'nonce': 0,
-            'height': 0,
-            'hash': util.EMPTY_TARGET,
-            'difficulty': util.difficultyStart(),
-            'events': [],
-            'version': 0,
-            'time': 0,
-            'previous_hash': util.EMPTY_TARGET,
-            'events_hash': None,
-            'meta': None,
-            'meta_hash': None
-        }
+    def create_block(self, account, block_hash):
+        def on_find_block(find_block_result):
+            if find_block_result.is_error:
+                self.app.callbacks.on_error(find_block_result.content)
+                return
+            self.get_events(account, find_block_result.content)
 
-    def generate_events(self, account, from_block):
-        event_results = get_request(EVENTS_URL, {'limit': util.eventsMaxLimit()})
-        def on_get_events(get_events_result):
-            if event_results:
-                unused_events = []
-                for unused_event in database.get_unused_events(from_star_log=next_star_log['hash']):
-                    unused_events.append(unused_event['key'])
-                used_inputs = []
-                used_outputs = []
-                events = []
-                for event in event_results:
-                    validate.event(event, require_index=False, require_star_system=True, reward_allowed=False)
-                    conflict = False
-                    current_used_inputs = []
-                    for current_input in event['inputs']:
-                        conflict = current_input['key'] in used_inputs + current_used_inputs or current_input['key'] not in unused_events
-                        if conflict:
-                            break
-                        current_used_inputs.append(current_input['key'])
-                    if conflict:
-                        continue
-                    current_used_outputs = []
-                    for current_output in event['outputs']:
-                        output_key = current_output['key']
-                        conflict = output_key in used_inputs + used_outputs + current_used_inputs + current_used_outputs
-                        if conflict:
-                            break
-                        current_used_outputs.append(output_key)
-                    if conflict:
-                        continue
-                    if not allow_duplicate_events:
-                        if database.any_events_used(current_used_inputs, next_star_log['hash']) or database.any_events_exist(current_used_outputs, next_star_log['hash']):
-                            continue
-                    
-                    used_inputs += current_used_inputs
-                    used_outputs += current_used_outputs
-                    event['index'] = len(events)
-                    events.append(event)
-                
-                next_star_log['events'] += events
+        if block_hash is None:
+            # If genesis...
+            block = BlockModel()
+
+            block.hash = util.EMPTY_TARGET
+            block.nonce = 0
+            block.previous_hash = util.EMPTY_TARGET
+            block.height = 0
+            block.difficulty = util.difficultyStart()
+            block.time = util.get_time()
+            block.events = []
+
+            on_find_block(CallbackResult(block))
+        else:
+            raise NotImplementedError
+
+    def get_meta(self, account, block):
+        def on_get_meta(get_meta_result):
+            if get_meta_result.is_error:
+                self.app.callbacks.on_error(get_meta_result.context)
+                return
+            block.meta = get_meta_result.content
+            self.get_events(account, block)
+        self.app.database.meta.find_meta(on_get_meta)
+
+    def get_events(self, account, block):
+        reward_event = EventModel()
+        reward_event.index = 0
+        reward_event.fleet = account.get_fleet()
+        # TODO: Enumify this somewhere...
+        reward_event.event_type = 'reward'
+        reward_event.inputs = []
+        reward_event.outputs = []
+
+        reward_output = EventOutputModel()
+        reward_output.index = 0
+        reward_output.fleet = account.get_fleet()
+        # TODO: Enumify this somewhere...
+        reward_output.output_type = 'reward'
+        reward_output.key = util.get_unique_key()
+        reward_output.model = self.app.blueprints.get_default_vessel()
+
+        reward_event.outputs.append(reward_output)
+        reward_event.generate_signature(account.private_key)
+        
+        block.events.append(reward_event)
+
+        if block.is_genesis():
+            self.generate_hash(block)
+            return
+        
+        def on_find_node(find_node_result):
+            if find_node_result.is_error:
+                self.app.callbacks.on_error(find_node_result.content)
+                return
+            if find_node_result.content is None:
+                self.app.callbacks.on_error('No node available')
+                return
+            def on_get_events(get_events_result):
+                if get_events_result.is_error:
+                    self.app.callbacks.on_error(get_events_result.content)
+                    return
+                self.filter_events(account, block, get_events_result.content)
+            self.app.remote.get_events(find_node_result.content, on_get_events)
+            
+        self.app.database.node.find_recent_node(on_find_node)
+
+    def filter_events(self, account, block, events):
+        raise NotImplementedError
+
+    def generate_hash(self, block):
+        raise NotImplementedError
 
 '''
     # def generate_next_star_log(self, from_star_log=None, from_genesis=False, allow_duplicate_events=False, start_time=None, timeout=180):
@@ -199,3 +239,24 @@ class ProbeCommand(BaseCommand):
             raise CommandException('Unable to probe a new starlog')
         return next_star_log
     '''
+
+
+'''
+    def get_genesis(self):
+        # TODO: Turn this into a model
+        return {
+            'hash': util.EMPTY_TARGET,
+            'nonce': 0,
+            'previous_hash': util.EMPTY_TARGET,
+            'height': 0,
+            'version': 0,
+            'difficulty': util.difficultyStart(),
+            'time': 0,
+            'events': [],
+            'events_hash': None,
+            'meta': None,
+            'meta_hash': None
+        }
+
+
+'''

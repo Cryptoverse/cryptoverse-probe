@@ -11,26 +11,31 @@ class BlueprintService(object):
 
     def get_default_hull(self):
         return HullModel(
-            hash = '4a28968dc2cdcdcc4d02d891fb98b11755ee6bf027d49bb5f6c0ab249a37ab68',
-            mass_limit = 5000
+            blueprint = '4a28968dc2cdcdcc4d02d891fb98b11755ee6bf027d49bb5f6c0ab249a37ab68',
+            mass_limit = 5000,
+            delta = False
         )
     
     def get_default_cargo(self):
         return CargoModel(
-            hash = '6b6b84a56c470a6bf598e661ac81f106b509c52e73715529311536014fbe45cf',
+            blueprint = '6b6b84a56c470a6bf598e661ac81f106b509c52e73715529311536014fbe45cf',
             health_limit = 10,
+            health = 10,
             mass = 25,
-            mass_limit = 1000
+            mass_limit = 1000,
+            delta = False
         )
     
     def get_default_jump_drive(self):
         return JumpDriveModel(
-            hash = '75e23c09fc113178bddb3eb695a7ade5fab6d7246c5aea71138cdd15472273a1',
+            blueprint = '75e23c09fc113178bddb3eb695a7ade5fab6d7246c5aea71138cdd15472273a1',
             health_limit = 10,
+            health = 10,
             mass = 25,
             distance_scalar = 1.0,
             fuel_scalar = 1.0,
-            mass_limit = 5000
+            mass_limit = 5000,
+            delta = False
         )
 
     def get_default_vessel(self):
@@ -40,11 +45,11 @@ class BlueprintService(object):
         cargo.contents = ResourceModel()
         cargo.contents.fuel = cargo.mass_limit
 
-        jump_drive = self.get_default_jump_drive(),
+        jump_drive = self.get_default_jump_drive()
         jump_drive.index = 1
 
         return VesselModel(
-            hash = hull.hash,
+            blueprint = hull.blueprint,
             modules = [
                 cargo,
                 jump_drive

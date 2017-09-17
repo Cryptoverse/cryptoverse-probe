@@ -22,5 +22,6 @@ class SyncCommand(BaseCommand):
         raise NotImplementedError
 
     def synchronize(self, done=None):
+        # TODO: This should actually... do something...
         if done:
             done(CallbackResult())

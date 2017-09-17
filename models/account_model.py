@@ -1,4 +1,5 @@
 from models.base_model import BaseModel
+from models.fleet_model import FleetModel
 import util
 
 class AccountModel(BaseModel):
@@ -12,6 +13,11 @@ class AccountModel(BaseModel):
 
     def get_fleet_name(self):
         return util.get_fleet_hash_name(self.public_key)
+    
+    def get_fleet(self):
+        fleet = FleetModel()
+        fleet.set_from_account(self)
+        return fleet
 
     def get_pretty_content(self):
         content = super(AccountModel, self).get_pretty_content()

@@ -69,3 +69,6 @@ class BaseRemote(object):
 
     def get_rules(self, node, done):
         raise NotImplementedError
+
+    def get_events(self, node, done):
+        raise NotImplementedError

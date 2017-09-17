@@ -81,8 +81,8 @@ if jumpDistanceMaximum() <= 0:
     raise Exception('JUMP_DIST_MAX must be greater than 0.0')
 
 
-def is_genesis_star_log(sha):
-    """Checks if the provided hash could only belong to the parent of the genesis star log.
+def is_genesis_block(sha):
+    """Checks if the provided hash could only belong to the parent of the genesis block.
 
     Args:
         sha (str): Hash to check.
@@ -201,7 +201,6 @@ def calculate_difficulty(difficulty, duration):
 
     return difficulty_from_hex(difficulty_from_target(hex(result)[2:]))
 
-
 def concat_star_log_header(star_log, include_nonce=True):
     """Concats the header information from the provided json.
     
@@ -212,7 +211,6 @@ def concat_star_log_header(star_log, include_nonce=True):
         str: Resulting header.
     """
     return '%s%s%s%s%s%s%s' % (star_log['version'], star_log['previous_hash'], star_log['difficulty'], star_log['events_hash'], star_log['meta_hash'], star_log['time'], star_log['nonce'] if include_nonce else '')
-
 
 def concat_event(event_json):
     """Concats the information of an event from the provided json.
@@ -231,7 +229,6 @@ def concat_event(event_json):
         for current_output in sorted(event_json['outputs'], key=lambda x: x['index']):
             concat += '%s%s%s%s%s' % (current_output['type'], current_output['fleet_hash'], current_output['key'], current_output['star_system'], current_output['count'])
     return concat
-
 
 def expand_rsa_public_key(shrunk_public_key):
     """Reformats a shrunk Rsa public key.
@@ -266,7 +263,6 @@ def rsa_sign(private_key, message):
         hashes.SHA256()
     )
     return binascii.hexlify(bytearray(signature))
-
 
 def hash_star_log(star_log):
     """Hashed value of the provided star log's header.
@@ -512,7 +508,6 @@ def get_unique_key():
         str: The sha256 of a unique id.
     """
     return sha256(str(uuid.uuid4()))
-
 
 def get_fleet_hash_name(stripped_public_key, length=6):
     """Gets the human readable name for a fleet by hashing and shortening its stripped public key.

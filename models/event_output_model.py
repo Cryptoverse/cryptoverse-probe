@@ -11,6 +11,22 @@ class EventOutputModel(BaseModel):
         self.location = None
         self.model = None
 
+    def get_concat(self):
+        if self.fleet is None:
+            raise ValueError('fleet cannot be None')
+        if self.fleet.public_key is None:
+            raise ValueError('fleet.public_key cannot be None')
+        if self.model is None:
+            raise ValueError('model cannot be None')
+        if self.output_type is None:
+            raise ValueError('output_type cannot be None')
+        if self.key is None:
+            raise ValueError('key cannot be None')
+        serialized_location = '' if self.location is None else self.location
+        result = '%s%s%s%s' % (self.output_type, self.fleet.get_hash(), self.key, serialized_location)
+        result += self.model.get_concat()
+        return result
+
     def get_pretty_content(self):
         content = super(EventOutputModel, self).get_pretty_content()
         content += self.get_pretty_entry('index', self.index)

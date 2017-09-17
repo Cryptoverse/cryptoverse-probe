@@ -6,6 +6,8 @@ class ResourceModel(BaseModel):
         super(ResourceModel, self).__init__()
         self.fuel = None
 
+    def get_concat(self):
+        return '%s' % self.fuel
 
     def get_pretty_content(self):
         content = super(ResourceModel, self).get_pretty_content()

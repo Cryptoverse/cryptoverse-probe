@@ -27,6 +27,16 @@ class EventOutputModel(BaseModel):
         result += self.model.get_concat()
         return result
 
+    def get_json(self):
+        return {
+            'index': self.index,
+            'model': self.model.get_json(),
+            'fleet_hash': self.fleet.get_hash(),
+            'key': self.key,
+            'location': self.location,
+            'type': self.output_type
+        }
+
     def get_pretty_content(self):
         content = super(EventOutputModel, self).get_pretty_content()
         content += self.get_pretty_entry('index', self.index)

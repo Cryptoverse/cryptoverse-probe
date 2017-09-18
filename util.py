@@ -4,6 +4,7 @@ import binascii
 import time
 import math
 import uuid
+from json import dumps as json_dump
 import numpy
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -567,6 +568,8 @@ def get_shortened_hash(sha, length=6, strip_zeros=True):
     else:
         return sha[:length]
 
+def get_pretty_json(serialized):
+    return json_dump(serialized, sort_keys=True, indent=4, separators=(',', ': '))
 
 def get_time():
     """UTC time in seconds.

@@ -13,7 +13,7 @@ class BaseRemote(object):
         if done is None:
             raise TypeError('"done" cannot be None')
         self.on_initialized = done
-        self.app.database.find_recent_nodes(self.on_recent_nodes)
+        self.app.database.node.find_recent_nodes(self.on_recent_nodes)
 
     def on_recent_nodes(self, result):
         if result.is_error:
@@ -44,20 +44,29 @@ class BaseRemote(object):
             else:
                 node_rules, node_limits = get_rules_result.content
                 current_node.last_response_datetime = util.get_time()
-                if local_rules.is_match(node_rules):
-                    current_node.events_limit_max = node_limits.events_limit_max
-                    current_node.blocks_limit_max = node_limits.blocks_limit_max
-                    self.node_success_count += 1
-                else:
-                    current_node.blacklisted = True
-                    current_node.blacklist_reason = 'Rules do not match local rules'
-                def on_write_node(write_node_result):
-                    if write_node_result.is_error:
-                        self.on_initialized(write_node_result)
+                
+                def on_check_local_rules(check_local_rules_result):
+                    if check_local_rules_result.is_error:
+                        self.on_initialized(check_local_rules_result)
                         return
-                    on_continue()
-                self.app.database.node.write(current_node, on_write_node)
-
+                    local_rules = check_local_rules_result.content
+                    if local_rules.is_match(node_rules):
+                        current_node.events_limit_max = node_limits.events_limit_max
+                        current_node.blocks_limit_max = node_limits.blocks_limit_max
+                        self.node_success_count += 1
+                    else:
+                        current_node.blacklisted = True
+                        current_node.blacklist_reason = 'Rules do not match local rules'
+                    def on_write_node(write_node_result):
+                        if write_node_result.is_error:
+                            self.on_initialized(write_node_result)
+                            return
+                        on_continue()
+                    self.app.database.node.write(current_node, on_write_node)
+                if local_rules is None:
+                    self.app.database.rules.write(node_rules, on_check_local_rules)
+                else:
+                    on_check_local_rules(CallbackResult(local_rules))
         current_node.last_request_datetime = util.get_time()
         self.get_rules(current_node, on_get_rules)
 
@@ -71,4 +80,7 @@ class BaseRemote(object):
         raise NotImplementedError
 
     def get_events(self, node, done):
+        raise NotImplementedError
+
+    def post_block(self, node, block, done):
         raise NotImplementedError

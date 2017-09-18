@@ -9,9 +9,18 @@ class EventModel(BaseModel):
         self.hash = None
         self.fleet = None
         self.event_type = None
-        self.inputs = None
-        self.outputs = None
+        self.inputs = []
+        self.outputs = []
         self.signature = None
+
+    def assign_hash(self):
+        """Calculates and assigns the hash of this event.
+
+        Returns:
+            str: Sha256 hash of this event.
+        """
+        self.hash = util.sha256(self.get_concat())
+        return self.hash
 
     def get_concat(self):
         if self.fleet is None:
@@ -34,6 +43,28 @@ class EventModel(BaseModel):
             raise ValueError('fleet.public_key cannot be None')
         concat = self.get_concat()
         self.signature = util.rsa_sign(private_key, concat)
+
+    def get_json(self):
+        inputs = []
+        if self.inputs is not None:
+            for current_input in self.inputs:
+                inputs.append(current_input.get_json())
+
+        outputs = []
+        if self.outputs is not None:
+            for current_output in self.outputs:
+                outputs.append(current_output.get_json())
+
+        return {
+            'fleet_hash': self.fleet.get_hash(),
+            'fleet_key': self.fleet.public_key,
+            'hash': self.hash,
+            'inputs': inputs,
+            'outputs': outputs,
+            'signature': self.signature,
+            'type': self.event_type
+        }
+
 
     def get_pretty_content(self):
         content = super(EventModel, self).get_pretty_content()

@@ -35,7 +35,7 @@ class CommandService(object):
             else:
                 self.command_last = result.content.command if result.content else None
                 self.initialize_command_count(done)
-        self.app.database.find_command_history(0, on_result)
+        self.app.database.command_history.find_command_history(0, on_result)
 
     def initialize_command_count(self, done):
         def on_result(result):
@@ -155,7 +155,7 @@ class CommandService(object):
             raise
 
     def set_from_history(self, index):
-        self.app.database.find_command_history(index, self.on_set_from_history)
+        self.app.database.command_history.find_command_history(index, self.on_set_from_history)
 
     def on_set_from_history(self, result):
         if result.is_error:

@@ -1,4 +1,5 @@
 from traceback import print_exc
+from json import dumps as json_dump
 import requests
 from callback_result import CallbackResult
 from remote_services.base_remote import BaseRemote
@@ -17,6 +18,7 @@ class WebRemote(BaseRemote):
         limits = NodeLimitsModel()
         try:
             json = result.content
+            rules.version = json['version']
             rules.jump_cost_min = json['jump_cost_min']
             rules.jump_cost_max = json['jump_cost_max']
             rules.jump_distance_max = json['jump_distance_max']
@@ -38,6 +40,12 @@ class WebRemote(BaseRemote):
         # TODO: All this
         done(CallbackResult([]))
 
+    def post_block(self, node, block, done):
+        result = self.post_request('%s/blocks' % node.url, json_dump(block.get_json()))
+        print result.content
+        done(result)
+        # TODO: this
+
     def get_request(self, url, payload=None, verbose=False):
         try:
             return CallbackResult(requests.get(url, payload).json())
@@ -45,3 +53,11 @@ class WebRemote(BaseRemote):
             if verbose:
                 print_exc()
             return CallbackResult('Error on get request: %s' % url, False)
+
+    def post_request(self, url, payload=None, verbose=False):
+        try:
+            return CallbackResult(requests.post(url, data=payload, headers={'content-type': 'application/json', 'cache-control': 'no-cache', }).json())
+        except:
+            if verbose:
+                print_exc()
+            return CallbackResult('error on post request %s' % url, False)

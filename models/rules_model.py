@@ -4,6 +4,7 @@ class RulesModel(BaseModel):
 
     def __init__(self):
         super(RulesModel, self).__init__()
+        self.version = None
         self.jump_cost_min = None
         self.jump_cost_max = None
         self.jump_distance_max = None
@@ -15,7 +16,8 @@ class RulesModel(BaseModel):
         self.probe_reward = None
 
     def is_match(self, other):
-        return (self.jump_cost_min == other.jump_cost_min and
+        return (self.version == other.version and
+                self.jump_cost_min == other.jump_cost_min and
                 self.jump_cost_max == other.jump_cost_max and
                 self.jump_distance_max == other.jump_distance_max and
                 self.difficulty_fudge == other.difficulty_fudge and
@@ -27,6 +29,7 @@ class RulesModel(BaseModel):
 
     def get_pretty_content(self):
         content = super(RulesModel, self).get_pretty_content()
+        content += self.get_pretty_entry('version', self.version)
         content += self.get_pretty_entry('jump_cost_min', self.jump_cost_min)
         content += self.get_pretty_entry('jump_cost_max', self.jump_cost_max)
         content += self.get_pretty_entry('jump_distance_max', self.jump_distance_max)

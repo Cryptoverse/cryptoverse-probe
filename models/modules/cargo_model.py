@@ -7,6 +7,12 @@ class CargoModel(BaseModuleModel):
         self.contents = kwargs.get('contents')
         self.mass_limit = kwargs.get('mass_limit')
 
+    def get_json(self):
+        result = super(CargoModel, self).get_json()
+        result['contents'] = self.contents.get_json()
+        result['mass_limit'] = self.mass_limit
+        return result
+
     def get_concat(self):
         if self.contents is None:
             raise ValueError('contents cannot be None')

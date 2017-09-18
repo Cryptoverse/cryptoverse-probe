@@ -12,6 +12,12 @@ class EventInputModel(BaseModel):
             raise ValueError('key cannot be None')
         return self.key
 
+    def get_json(self):
+        return {
+            'index': self.index,
+            'key': self.key
+        }
+
     def get_pretty_content(self):
         content = super(EventInputModel, self).get_pretty_content()
         content += self.get_pretty_entry('index', self.index)

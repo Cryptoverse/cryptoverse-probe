@@ -9,6 +9,11 @@ class ResourceModel(BaseModel):
     def get_concat(self):
         return '%s' % self.fuel
 
+    def get_json(self):
+        return {
+            'fuel': self.fuel
+        }
+
     def get_pretty_content(self):
         content = super(ResourceModel, self).get_pretty_content()
         content += self.get_pretty_entry('fuel', self.fuel)

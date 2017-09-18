@@ -27,8 +27,7 @@ class CommandHistorySqlite(BaseSqliteHandler):
                 model.id = cursor.lastrowid
             else:
                 cursor.execute('UPDATE command_history SET command=?, time=?, session_order=? WHERE rowid=?', (model.command, model.time, model.session_order))
-
-            if self.COMMAND_HISTORY_LIMIT <= self.locked_count(cursor):
+            if self.COMMAND_HISTORY_LIMIT < self.locked_count(cursor):
                 delete_start = cursor.execute('SELECT time FROM command_history ORDER BY time DESC, session_order DESC LIMIT 1 OFFSET ?', (self.COMMAND_HISTORY_LIMIT,)).fetchone()[0]
                 cursor.execute('DELETE FROM command_history WHERE time <= ?', (delete_start,))
 

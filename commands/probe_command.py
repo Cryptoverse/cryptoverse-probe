@@ -7,6 +7,7 @@ from models.event_model import EventModel
 from models.event_output_model import EventOutputModel
 from models.event_outputs.vessel_model import VesselModel
 from models.fleet_model import FleetModel
+from probe_exceptions import ProbeTimeoutException
 import util
 
 class ProbeCommand(BaseCommand):
@@ -38,7 +39,7 @@ class ProbeCommand(BaseCommand):
                 if get_account_result.content is None:
                     self.app.callbacks.on_error('No active account')
                     return
-                self.create_block(get_account_result.content, None)
+                self.get_rules(get_account_result.content, None)
             self.app.database.account.find_account_active(on_get_account)
             
 
@@ -53,12 +54,23 @@ class ProbeCommand(BaseCommand):
                 #         sync('-s')
         self.app.commands.get_command(SyncCommand.COMMAND_NAME).synchronize(on_sync)
 
-    def create_block(self, account, block_hash):
+    def get_rules(self, account, block_hash):
+        def on_find_rules(find_rules_result):
+            if find_rules_result.is_error:
+                self.app.callbacks.on_error(find_rules_result.content)
+                return
+            if find_rules_result.content is None:
+                self.app.callbacks.on_error('No rules have been set, unable to probe')
+                return
+            self.create_block(find_rules_result.content, account, block_hash)
+        self.app.database.rules.find_rules(on_find_rules)
+
+    def create_block(self, rules, account, block_hash):
         def on_find_block(find_block_result):
             if find_block_result.is_error:
                 self.app.callbacks.on_error(find_block_result.content)
                 return
-            self.get_events(account, find_block_result.content)
+            self.get_events(rules, account, find_block_result.content)
 
         if block_hash is None:
             # If genesis...
@@ -71,21 +83,22 @@ class ProbeCommand(BaseCommand):
             block.difficulty = util.difficultyStart()
             block.time = util.get_time()
             block.events = []
+            block.version = rules.version
 
             on_find_block(CallbackResult(block))
         else:
             raise NotImplementedError
 
-    def get_meta(self, account, block):
+    def get_meta(self, rules, account, block):
         def on_get_meta(get_meta_result):
             if get_meta_result.is_error:
                 self.app.callbacks.on_error(get_meta_result.context)
                 return
             block.meta = get_meta_result.content
-            self.get_events(account, block)
+            self.get_events(rules, account, block)
         self.app.database.meta.find_meta(on_get_meta)
 
-    def get_events(self, account, block):
+    def get_events(self, rules, account, block):
         reward_event = EventModel()
         reward_event.index = 0
         reward_event.fleet = account.get_fleet()
@@ -108,7 +121,7 @@ class ProbeCommand(BaseCommand):
         block.events.append(reward_event)
 
         if block.is_genesis():
-            self.generate_hash(block)
+            self.generate_hash(rules, block)
             return
         
         def on_find_node(find_node_result):
@@ -122,16 +135,87 @@ class ProbeCommand(BaseCommand):
                 if get_events_result.is_error:
                     self.app.callbacks.on_error(get_events_result.content)
                     return
-                self.filter_events(account, block, get_events_result.content)
+                self.filter_events(rules, account, block, get_events_result.content)
             self.app.remote.get_events(find_node_result.content, on_get_events)
             
         self.app.database.node.find_recent_node(on_find_node)
 
-    def filter_events(self, account, block, events):
+    def filter_events(self, rules, account, block, events):
         raise NotImplementedError
 
-    def generate_hash(self, block):
-        raise NotImplementedError
+    def generate_hash(self, rules, block):
+
+        # TODO: Figure out where timout should be set...
+        timeout = 180
+
+        found = False
+        tries = 0
+        check_interval = 10000000
+        next_check = check_interval
+        curr_started = datetime.now()
+        started = curr_started
+        last_checkin = curr_started
+        # This initial hash hangles the hashing of events and such.
+        current_difficulty = block.get_difficulty_target(rules.difficulty_fudge, True)
+        current_difficulty_leading_zeros = len(current_difficulty) - len(current_difficulty.lstrip('0'))
+        current_nonce = 0
+        log_prefix = block.get_concat(False)
+        current_hash = None
+
+        while not found:
+            current_hash = block.assign_hash(current_nonce, log_prefix)
+            found = block.is_valid(rules.difficulty_fudge, current_difficulty, current_difficulty_leading_zeros)
+            if found:
+                break
+            
+            if tries == next_check:
+                next_check = tries + check_interval
+                now = datetime.now()
+                if timeout < (now - curr_started).total_seconds():
+                    raise ProbeTimeoutException('Probing timed out')
+                hashes_per_second = tries / (now - last_checkin).total_seconds()
+                elapsed_minutes = (now - started).total_seconds() / 60
+                print '\tProbing at %.0f hashes per second, %.1f minutes elapsed...' % (hashes_per_second, elapsed_minutes)
+            current_nonce += 1
+            if util.MAXIMUM_NONCE <= current_nonce:
+                current_nonce = 0
+                block.time = util.get_time()
+                log_prefix = block.get_concat(False)
+            tries += 1
+        if found:
+            self.on_generate_hash(block)
+        else:
+            self.app.callbacks.on_error('Unable to probe a new starlog')
+
+    def on_generate_hash(self, block):
+        def on_recent_nodes(recent_nodes_result):
+            if recent_nodes_result.is_error:
+                self.app.callbacks.on_error(recent_nodes_result.content)
+                return
+            self.post_to_nodes(block, recent_nodes_result.content)
+        self.app.database.node.find_recent_nodes(on_recent_nodes)
+        
+
+    def post_to_nodes(self, block, nodes, node_successes=None):
+        if node_successes is None:
+            node_successes = []
+        
+        if len(nodes) == 0:
+            self.on_post_block(len(node_successes))
+            return
+
+        current_node = nodes[0]
+        nodes = nodes[1:]
+
+        def on_post(post_result):
+            if not post_result.is_error:
+                node_successes.append(current_node)
+            self.post_to_nodes(block, nodes, node_successes)
+        self.app.remote.post_block(current_node, block, on_post)
+
+    def on_post_block(self, success_count):
+        # TODO: call output, instead of just printing...
+        print 'posted successfully to %s nodes' % success_count
 
 '''
     # def generate_next_star_log(self, from_star_log=None, from_genesis=False, allow_duplicate_events=False, start_time=None, timeout=180):

@@ -15,6 +15,18 @@ class VesselModel(BaseModel):
             result += current_module.get_concat()
         return result
 
+    def get_json(self):
+        modules = []
+        if self.modules is not None:
+            for module in self.modules:
+                modules.append(module.get_json())
+
+        return {
+            'blueprint': self.blueprint,
+            'modules': modules,
+            'type': 'vessel'
+        }
+
     def get_pretty_content(self):
         content = super(VesselModel, self).get_pretty_content()
         content += self.get_pretty_entry('blueprint', self.blueprint)

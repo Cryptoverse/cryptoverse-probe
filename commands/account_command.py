@@ -30,7 +30,7 @@ class AccountCommand(BaseCommand):
     # Events
 
     def on_current_account(self):
-        self.app.database.find_account_active(self.on_find_current_account)
+        self.app.database.account.find_account_active(self.on_find_current_account)
 
     def on_find_current_account(self, result):
         if result.is_error:

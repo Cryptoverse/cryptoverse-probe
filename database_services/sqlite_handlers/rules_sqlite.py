@@ -9,6 +9,7 @@ class RulesSqlite(BaseSqliteHandler):
             RulesModel,
             'rules',
             [
+                'version',
                 'jump_cost_min',
                 'jump_cost_max',
                 'jump_distance_max',
@@ -27,6 +28,7 @@ class RulesSqlite(BaseSqliteHandler):
         connection, cursor = self.begin()
         try:
             values = (
+                model.version,
                 model.jump_cost_min,
                 model.jump_cost_max,
                 model.jump_distance_max,
@@ -38,7 +40,7 @@ class RulesSqlite(BaseSqliteHandler):
                 model.probe_reward
             )
             if model.id is None:
-                cursor.execute('INSERT INTO rules VALUES (?,?,?,?,?,?,?,?,?)', values)
+                cursor.execute('INSERT INTO rules VALUES (?,?,?,?,?,?,?,?,?,?)', values)
                 model.id = cursor.lastrowid
             else:
                 cursor.execute('UPDATE rules SET %s WHERE rowid=?' % self.column_updates, values + (model.id,))
@@ -90,13 +92,14 @@ class RulesSqlite(BaseSqliteHandler):
     def model_from_request(self, result):
         model = RulesModel()
         model.id = result[0]
-        model.jump_cost_min = result[1]
-        model.jump_cost_max = result[2]
-        model.jump_distance_max = result[3]
-        model.difficulty_fudge = result[4]
-        model.difficulty_start = result[5]
-        model.difficulty_interval = result[6]
-        model.difficulty_duration = result[7]
-        model.cartesian_digits = result[8]
-        model.probe_reward = result[9]
+        model.version = result[1]
+        model.jump_cost_min = result[2]
+        model.jump_cost_max = result[3]
+        model.jump_distance_max = result[4]
+        model.difficulty_fudge = result[5]
+        model.difficulty_start = result[6]
+        model.difficulty_interval = result[7]
+        model.difficulty_duration = result[8]
+        model.cartesian_digits = result[9]
+        model.probe_reward = result[10]
         return model

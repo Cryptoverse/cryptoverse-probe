@@ -56,6 +56,7 @@ class EventModel(BaseModel):
                 outputs.append(current_output.get_json())
 
         return {
+            'index': self.index,
             'fleet_hash': self.fleet.get_hash(),
             'fleet_key': self.fleet.public_key,
             'hash': self.hash,

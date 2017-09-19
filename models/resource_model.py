@@ -7,7 +7,10 @@ class ResourceModel(BaseModel):
         self.fuel = None
 
     def get_concat(self):
-        return '%s' % self.fuel
+        result = ''
+        if 0 < self.fuel:
+            result += str(self.fuel)
+        return result
 
     def get_json(self):
         return {

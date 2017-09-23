@@ -28,6 +28,13 @@ class BaseModuleModel(BaseModel):
             'health': self.health
         }
 
+    def set_from_json(self, module_json):
+        self.blueprint = module_json['blueprint']
+        self.index = module_json['index']
+        self.module_type = module_json['type']
+        self.delta = module_json['delta']
+        self.health = module_json['health']
+
     def get_pretty_content(self):
         content = super(BaseModuleModel, self).get_pretty_content()
         content += self.get_pretty_entry('blueprint', self.blueprint)

@@ -10,13 +10,17 @@ class BaseDatabase(object):
         self.meta = kwargs.get('meta')
         self.node = kwargs.get('node')
         self.rules = kwargs.get('rules')
+        self.block = kwargs.get('block')
+        self.block_data = kwargs.get('block_data')
 
         self.database_handlers = [
             self.command_history,
             self.account,
             self.meta,
             self.node,
-            self.rules
+            self.rules,
+            self.block,
+            self.block_data
         ]
 
         self.uninitialized_handlers = self.database_handlers

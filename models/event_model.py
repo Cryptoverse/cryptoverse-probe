@@ -1,4 +1,7 @@
 from models.base_model import BaseModel
+from models.event_input_model import EventInputModel
+from models.event_output_model import EventOutputModel
+from models.fleet_model import FleetModel
 import util
 
 class EventModel(BaseModel):
@@ -65,6 +68,25 @@ class EventModel(BaseModel):
             'signature': self.signature,
             'type': self.event_type
         }
+
+
+    def set_from_json(self, event_json):
+        self.index = event_json['index']
+        self.hash = event_json['hash']
+        self.fleet = FleetModel()
+        self.fleet.public_key = event_json['fleet_key']
+        self.event_type = event_json['type']
+        self.signature = event_json['signature']
+        self.inputs = []
+        for event_input in event_json['inputs']:
+            current_input = EventInputModel()
+            current_input.set_from_json(event_input)
+            self.inputs.append(current_input)
+        self.outputs = []
+        for event_output in event_json['outputs']:
+            current_output = EventOutputModel()
+            current_output.set_from_json(event_output)
+            self.outputs.append(current_output)
 
 
     def get_pretty_content(self):

@@ -1,4 +1,5 @@
 from models.modules.base_module_model import BaseModuleModel
+from models.resource_model import ResourceModel
 
 class CargoModel(BaseModuleModel):
 
@@ -10,8 +11,12 @@ class CargoModel(BaseModuleModel):
     def get_json(self):
         result = super(CargoModel, self).get_json()
         result['contents'] = self.contents.get_json()
-        result['mass_limit'] = self.mass_limit
         return result
+
+    def set_from_json(self, module_json):
+        super(CargoModel, self).set_from_json(module_json)
+        self.contents = ResourceModel()
+        self.contents.set_from_json(module_json['contents'])
 
     def get_concat(self):
         if self.contents is None:

@@ -1,12 +1,12 @@
+from json import dumps as json_dump
 from datetime import datetime
 from commands.base_command import BaseCommand
-from sync_command import SyncCommand
+from commands.sync_command import SyncCommand
 from callback_result import CallbackResult
 from models.block_model import BlockModel
 from models.event_model import EventModel
 from models.event_output_model import EventOutputModel
-from models.event_outputs.vessel_model import VesselModel
-from models.fleet_model import FleetModel
+from models.block_data_model import BlockDataModel
 from probe_exceptions import ProbeTimeoutException
 import util
 
@@ -27,6 +27,7 @@ class ProbeCommand(BaseCommand):
             ]
         )
 
+
     def on_probe(self):
         def on_sync(sync_result):
             if sync_result.is_error:
@@ -41,18 +42,8 @@ class ProbeCommand(BaseCommand):
                     return
                 self.get_rules(get_account_result.content, None)
             self.app.database.account.find_account_active(on_get_account)
-            
-
-            # generated = None
-            # started = datetime.now()
-            # while generated is None:
-            #     pass
-                # try:
-                #     generated = generate_next_star_log(from_hash, from_genesis, allow_duplicate_events, started)
-                # except ProbeTimeoutException:
-                #     if not blind:
-                #         sync('-s')
         self.app.commands.get_command(SyncCommand.COMMAND_NAME).synchronize(on_sync)
+
 
     def get_rules(self, account, block_hash):
         def on_find_rules(find_rules_result):
@@ -64,6 +55,7 @@ class ProbeCommand(BaseCommand):
                 return
             self.create_block(find_rules_result.content, account, block_hash)
         self.app.database.rules.find_rules(on_find_rules)
+
 
     def create_block(self, rules, account, block_hash):
         def on_find_block(find_block_result):
@@ -89,6 +81,7 @@ class ProbeCommand(BaseCommand):
         else:
             raise NotImplementedError
 
+
     def get_meta(self, rules, account, block):
         def on_get_meta(get_meta_result):
             if get_meta_result.is_error:
@@ -97,6 +90,7 @@ class ProbeCommand(BaseCommand):
             block.meta = get_meta_result.content
             self.get_events(rules, account, block)
         self.app.database.meta.find_meta(on_get_meta)
+
 
     def get_events(self, rules, account, block):
         reward_event = EventModel()
@@ -140,8 +134,10 @@ class ProbeCommand(BaseCommand):
             
         self.app.database.node.find_recent_node(on_find_node)
 
+
     def filter_events(self, rules, account, block, events):
         raise NotImplementedError
+
 
     def generate_hash(self, rules, block):
 
@@ -160,10 +156,9 @@ class ProbeCommand(BaseCommand):
         current_difficulty_leading_zeros = len(current_difficulty) - len(current_difficulty.lstrip('0'))
         current_nonce = 0
         log_prefix = block.get_concat(False)
-        current_hash = None
 
         while not found:
-            current_hash = block.assign_hash(current_nonce, log_prefix)
+            block.assign_hash(current_nonce, log_prefix)
             found = block.is_valid(rules.difficulty_fudge, current_difficulty, current_difficulty_leading_zeros)
             if found:
                 break
@@ -187,14 +182,41 @@ class ProbeCommand(BaseCommand):
         else:
             self.app.callbacks.on_error('Unable to probe a new starlog')
 
+
     def on_generate_hash(self, block):
+        def on_check_unique(check_unique_result):
+            if not check_unique_result.is_error:
+                self.on_cached(block)
+                return
+            # Block and data needs to be cached.
+            def on_write_block(write_block_result):
+                if write_block_result.is_error:
+                    self.app.callbacks.on_error(write_block_result.content)
+                    return
+                block = write_block_result.content
+                def on_write_block_data(write_block_data_result):
+                    if write_block_data_result.is_error:
+                        self.app.callbacks.on_error(write_block_data_result.content)
+                        return
+                    self.on_cached(block)
+                block_data = BlockDataModel()
+                block_data.block_id = block.id
+                block_data.previous_block_id = block.previous_id
+                block_data.uri = 'data_json' # Not really used at the moment, will eventually lead to a path on disk
+                block_data.data = json_dump(block.get_json())
+                self.app.database.block_data.write(block_data, on_write_block_data)
+                
+            self.app.database.block.write(block, on_write_block)
+        self.app.database.block.find_block_by_hash(block.hash, on_check_unique)
+
+    def on_cached(self, block):
         def on_recent_nodes(recent_nodes_result):
             if recent_nodes_result.is_error:
                 self.app.callbacks.on_error(recent_nodes_result.content)
                 return
             self.post_to_nodes(block, recent_nodes_result.content)
         self.app.database.node.find_recent_nodes(on_recent_nodes)
-        
+
 
     def post_to_nodes(self, block, nodes, node_successes=None):
         if node_successes is None:
@@ -216,131 +238,3 @@ class ProbeCommand(BaseCommand):
     def on_post_block(self, success_count):
         # TODO: call output, instead of just printing...
         print 'posted successfully to %s nodes' % success_count
-
-'''
-    # def generate_next_star_log(self, from_star_log=None, from_genesis=False, allow_duplicate_events=False, start_time=None, timeout=180):
-    def generate_next_star_log(self, account, from_block, start_time=None, timeout=180):
-        next_star_log = from_block
-        is_genesis = util.is_genesis_star_log(next_star_log['hash'])
-        account_info = account
-        next_star_log['events'] = []
-
-        if not is_genesis:
-            
-
-        reward_output = {
-            'index': 0,
-            'type': 'reward',
-            'fleet_hash': util.sha256(account_info['public_key']),
-            'key': util.get_unique_key(),
-            'star_system': None,
-            'model': DEFAULT_VESSEL,
-            'model_type': 'vessel',
-        }
-
-        reward_event = {
-            'index': len(next_star_log['events']),
-            'hash': None,
-            'type': 'reward',
-            'fleet_hash': util.sha256(account_info['public_key']),
-            'fleet_key': account_info['public_key'],
-            'inputs': [],
-            'outputs': [
-                reward_output
-            ],
-            'signature': None
-        }
-
-        if not is_genesis:
-            # TODO: This won't work correctly if there are multiple genesis blocks!
-            # TODO: Change this to get from the local database
-            first_star_log = get_request(CHAINS_URL, {'height': 0})
-            # Until we have a way to select where to send your reward ships, just send them to the genesis block.
-            reward_output['star_system'] = first_star_log[0]['hash']
-
-        reward_event['hash'] = util.hash_event(reward_event)
-        reward_event['signature'] = util.rsa_sign(account_info['private_key'], reward_event['hash'])
-
-        meta = database.get_meta_content()
-        next_star_log['meta'] = '' if meta is None else meta
-        next_star_log['meta_hash'] = util.sha256(next_star_log['meta'])
-        next_star_log['events'].append(reward_event)
-        next_star_log['previous_hash'] = next_star_log['hash']
-        next_star_log['time'] = util.get_time()
-        next_star_log['nonce'] = 0
-        next_star_log['events_hash'] = util.hash_events(next_star_log['events'])
-        next_star_log['log_header'] = util.concat_star_log_header(next_star_log)
-        next_star_log['height'] = 0 if is_genesis else next_star_log['height'] + 1
-
-        if not is_genesis and util.is_difficulty_changing(next_star_log['height']):
-            # We have to recalculate the difficulty at this height.
-            previous_recalculation = database.get_star_log_at_height(next_star_log['previous_hash'], next_star_log['height'] - util.difficultyInterval())
-            previous_star_log = database.get_star_log(next_star_log['previous_hash'])
-            next_star_log['difficulty'] = util.calculate_difficulty(previous_recalculation['difficulty'], previous_star_log['time'] - previous_recalculation['time'])
-
-        found = False
-        tries = 0
-        check_interval = 10000000
-        next_check = check_interval
-        curr_started = datetime.now()
-        started = curr_started if start_time is None else start_time
-        last_checkin = curr_started
-        # This initial hash hangles the hashing of events and such.
-        next_star_log = util.hash_star_log(next_star_log)
-        current_difficulty = util.unpack_bits(next_star_log['difficulty'], True)
-        current_difficulty_leading_zeros = len(current_difficulty) - len(current_difficulty.lstrip('0'))
-        current_nonce = 0
-        log_prefix = util.concat_star_log_header(next_star_log, False)
-        current_hash = None
-
-        while not found:
-            current_hash = util.sha256('%s%s' % (log_prefix, current_nonce))
-            try:
-                validate.difficulty_unpacked(current_difficulty, current_difficulty_leading_zeros, current_hash, False)
-                found = True
-                break
-            except:
-                pass
-            if tries == next_check:
-                next_check = tries + check_interval
-                now = datetime.now()
-                if timeout < (now - curr_started).total_seconds():
-                    raise ProbeTimeoutException('Probing timed out')
-                hashes_per_second = tries / (now - last_checkin).total_seconds()
-                elapsed_minutes = (now - started).total_seconds() / 60
-                print '\tProbing at %.0f hashes per second, %.1f minutes elapsed...' % (hashes_per_second, elapsed_minutes)
-            current_nonce += 1
-            if util.MAXIMUM_NONCE <= current_nonce:
-                current_nonce = 0
-                next_star_log['time'] = util.get_time()
-                log_prefix = util.concat_star_log_header(next_star_log, False)
-            tries += 1
-        if found:
-            next_star_log['nonce'] = current_nonce
-            next_star_log['log_header'] = util.concat_star_log_header(next_star_log)
-            next_star_log['hash'] = current_hash
-        else:
-            raise CommandException('Unable to probe a new starlog')
-        return next_star_log
-    '''
-
-
-'''
-    def get_genesis(self):
-        # TODO: Turn this into a model
-        return {
-            'hash': util.EMPTY_TARGET,
-            'nonce': 0,
-            'previous_hash': util.EMPTY_TARGET,
-            'height': 0,
-            'version': 0,
-            'difficulty': util.difficultyStart(),
-            'time': 0,
-            'events': [],
-            'events_hash': None,
-            'meta': None,
-            'meta_hash': None
-        }
-
-
-'''

@@ -19,8 +19,7 @@ class BlockSqlite(BaseSqliteHandler):
                 'time', 
                 'interval_id',
                 'root_id',
-                'chain',
-                'events'
+                'chain'
             ]
         )
 
@@ -40,11 +39,10 @@ class BlockSqlite(BaseSqliteHandler):
                 model.time,
                 model.interval_id,
                 model.root_id,
-                model.chain,
-                model.events
+                model.chain
             )
             if model.id is None:
-                cursor.execute('INSERT INTO blocks VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', values)
+                cursor.execute('INSERT INTO blocks VALUES (?,?,?,?,?,?,?,?,?,?,?)', values)
                 model.id = cursor.lastrowid
             else:
                 cursor.execute('UPDATE blocks SET %s WHERE rowid=?' % self.column_updates, values + (model.id,))
@@ -132,5 +130,4 @@ class BlockSqlite(BaseSqliteHandler):
         model.interval_id = result[9]
         model.root_id = result[10]
         model.chain = result[11]
-        model.events = result[12]
         return model

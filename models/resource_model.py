@@ -16,6 +16,9 @@ class ResourceModel(BaseModel):
         return {
             'fuel': self.fuel
         }
+    
+    def set_from_json(self, resource_json):
+        self.fuel = resource_json.get('fuel', 0)
 
     def get_pretty_content(self):
         content = super(ResourceModel, self).get_pretty_content()

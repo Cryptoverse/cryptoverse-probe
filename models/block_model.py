@@ -1,4 +1,5 @@
 from models.base_model import BaseModel
+from models.event_model import EventModel
 import util
 
 class BlockModel(BaseModel):
@@ -189,6 +190,26 @@ class BlockModel(BaseModel):
             'meta': self.meta,
             'meta_hash': self.meta_hash
         }
+
+
+    def set_from_json(self, block_json):
+        self.hash = block_json['hash']
+        self.nonce = block_json['nonce']
+        self.previous_hash = block_json['previous_hash']
+        self.height = block_json['height']
+        self.size = block_json['size']
+        self.version = block_json['version']
+        self.difficulty = block_json['difficulty']
+        self.time = block_json['time']
+        self.events_hash = block_json['events_hash']
+        self.meta = block_json['meta']
+        self.meta_hash = block_json['meta_hash']
+        
+        self.events = []
+        for event in block_json['events']:
+            current_event = EventModel()
+            current_event.set_from_json(event)
+            self.events.append(current_event)
 
 
     def get_pretty_content(self):

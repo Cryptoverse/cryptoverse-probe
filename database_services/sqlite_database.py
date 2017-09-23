@@ -4,6 +4,8 @@ from database_services.sqlite_handlers.account_sqlite import AccountSqlite
 from database_services.sqlite_handlers.meta_sqlite import MetaSqlite
 from database_services.sqlite_handlers.node_sqlite import NodeSqlite
 from database_services.sqlite_handlers.rules_sqlite import RulesSqlite
+from database_services.sqlite_handlers.block_sqlite import BlockSqlite
+from database_services.sqlite_handlers.block_data_sqlite import BlockDataSqlite
 
 class SqliteDatabase(BaseDatabase):
 
@@ -14,5 +16,7 @@ class SqliteDatabase(BaseDatabase):
             account = AccountSqlite(),
             meta = MetaSqlite(),
             node = NodeSqlite(),
-            rules = RulesSqlite()
+            rules = RulesSqlite(),
+            block = BlockSqlite(),
+            block_data = BlockDataSqlite()
         )

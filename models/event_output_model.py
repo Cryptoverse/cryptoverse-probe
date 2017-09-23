@@ -1,4 +1,6 @@
 from models.base_model import BaseModel
+from models.fleet_model import FleetModel
+from models.event_outputs.vessel_model import VesselModel
 
 class EventOutputModel(BaseModel):
 
@@ -36,6 +38,25 @@ class EventOutputModel(BaseModel):
             'location': self.location,
             'type': self.output_type
         }
+
+
+    def set_from_json(self, event_output_json):
+        self.index = event_output_json['index']
+        self.fleet = FleetModel()
+        self.fleet.public_key = event_output_json['fleet_hash']
+        self.output_type = event_output_json['type']
+        self.key = event_output_json['key']
+        self.location = event_output_json['location']
+        output_model_json = event_output_json['model']
+        if output_model_json is None:
+            ValueError('model cannot be None')
+        model_type = output_model_json['type']
+        if model_type == 'vessel':
+            self.model = VesselModel()
+            self.model.set_from_json(output_model_json)
+        else:
+            ValueError('model type %s not recognized' % model_type)
+
 
     def get_pretty_content(self):
         content = super(EventOutputModel, self).get_pretty_content()

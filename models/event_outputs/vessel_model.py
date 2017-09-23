@@ -1,4 +1,6 @@
 from models.base_model import BaseModel
+from models.modules.cargo_model import CargoModel
+from models.modules.jump_drive_model import JumpDriveModel
 
 class VesselModel(BaseModel):
 
@@ -26,6 +28,22 @@ class VesselModel(BaseModel):
             'modules': modules,
             'type': 'vessel'
         }
+
+    def set_from_json(self, vessel_json):
+        self.blueprint = vessel_json['blueprint']
+        self.modules = []
+        for module_json in vessel_json['modules']:
+            module_type = module_json['type']
+            module = None
+            if module_type == 'cargo':
+                module = CargoModel()
+            elif module_type == 'jump_drive':
+                module = JumpDriveModel()
+            else:
+                ValueError('unrecognized module type %s' % module_type)
+            module.set_from_json(module_json)
+            self.modules.append(module)
+            
 
     def get_pretty_content(self):
         content = super(VesselModel, self).get_pretty_content()

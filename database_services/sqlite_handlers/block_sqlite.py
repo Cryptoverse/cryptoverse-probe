@@ -65,16 +65,6 @@ class BlockSqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
-    def drop(self, model, done=None):
-        connection, cursor = self.begin()
-        try:
-            cursor.execute('DELETE FROM blocks WHERE rowid=?', (model.id,))
-            connection.commit()
-            if done:
-                done(CallbackResult())
-        finally:
-            connection.close()
-
     # Optimized functionality
 
     def find_block_by_id(self, model_id, done):
@@ -111,6 +101,19 @@ class BlockSqlite(BaseSqliteHandler):
                 done(CallbackResult(self.model_from_request(highest_oldest_result)))
             else:
                 done(CallbackResult('No blocks found', False))
+        finally:
+            connection.close()
+
+    def find_highest_block_on_chain(self, chain, done):
+        connection, cursor = self.begin()
+        try:
+            result = cursor.execute('SELECT rowid, * FROM blocks WHERE chain=? ORDER BY height DESC', (chain,)).fetchone()
+            if result:
+                model = self.model_from_request(result)
+                highest_oldest_result = cursor.execute('SELECT rowid, * FROM blocks WHERE height=? AND chain=? ORDER BY time ASC', (model.height,chain)).fetchone()
+                done(CallbackResult(self.model_from_request(highest_oldest_result)))
+            else:
+                done(CallbackResult('No blocks on chain %s found' % chain, False))
         finally:
             connection.close()
 

@@ -44,14 +44,6 @@ class MetaSqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
-    def drop(self, model, done=None):
-        connection, cursor = self.begin()
-        try:
-            cursor.execute('DELETE FROM meta WHERE rowid=?', (model.id,))
-            connection.commit()
-        finally:
-            connection.close()
-
     # Optimized functionality
 
     def find_meta(self, done):

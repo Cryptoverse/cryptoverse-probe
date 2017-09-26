@@ -63,16 +63,6 @@ class RulesSqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
-    def drop(self, model, done=None):
-        connection, cursor = self.begin()
-        try:
-            cursor.execute('DELETE FROM rules WHERE rowid=?', (model.id,))
-            connection.commit()
-            if done:
-                done(CallbackResult())
-        finally:
-            connection.close()
-
     # Optimized functionality
 
     def find_rules(self, done):

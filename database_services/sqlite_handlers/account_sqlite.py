@@ -78,14 +78,6 @@ class AccountSqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
-    def drop(self, model, done=None):
-        connection, cursor = self.begin()
-        try:
-            cursor.execute('DELETE FROM accounts WHERE rowid=?', (model.id,))
-            connection.commit()
-        finally:
-            connection.close()
-
     # Optimized functionality
 
     def find_account(self, name, done):

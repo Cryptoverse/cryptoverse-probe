@@ -7,7 +7,8 @@ from commands import (
     nodes_command,
     rules_command,
     probe_command,
-    sync_command
+    sync_command,
+    blocks_command
 )
 
 ALL_COMMANDS = [
@@ -19,5 +20,6 @@ ALL_COMMANDS = [
     nodes_command.NodesCommand,
     rules_command.RulesCommand,
     probe_command.ProbeCommand,
-    sync_command.SyncCommand
+    sync_command.SyncCommand,
+    blocks_command.BlocksCommand
 ]

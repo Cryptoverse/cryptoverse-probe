@@ -51,16 +51,6 @@ class BlockDataSqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
-    def drop(self, model, done=None):
-        connection, cursor = self.begin()
-        try:
-            cursor.execute('DELETE FROM block_data WHERE rowid=?', (model.id,))
-            connection.commit()
-            if done:
-                done(CallbackResult())
-        finally:
-            connection.close()
-
     # Optimized functionality
 
     def find_data_by_block_id(self, block_id, done):

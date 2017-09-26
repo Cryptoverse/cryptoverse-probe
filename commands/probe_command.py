@@ -57,39 +57,90 @@ class ProbeCommand(BaseCommand):
         self.app.database.rules.find_rules(on_find_rules)
 
 
-    def create_block(self, rules, account, block_hash):
-        def on_find_block(find_block_result):
-            if find_block_result.is_error:
-                self.app.callbacks.on_error(find_block_result.content)
-                return
-            self.get_events(rules, account, find_block_result.content)
-
-        if block_hash is None:
+    def create_block(self, rules, account, block_hash=None, is_genesis=False):
+        block = BlockModel()
+        block.hash = rules.empty_target
+        block.nonce = 0
+        block.previous_hash = rules.empty_target
+        block.height = 0
+        block.difficulty = rules.difficulty_start
+        block.time = util.get_time()
+        block.events = []
+        block.version = rules.version
+        block.chain = util.get_unique_key()
+        if is_genesis:
             # If genesis...
-            block = BlockModel()
-
-            block.hash = rules.empty_target
-            block.nonce = 0
-            block.previous_hash = rules.empty_target
-            block.height = 0
-            block.difficulty = rules.difficulty_start
-            block.time = util.get_time()
-            block.events = []
-            block.version = rules.version
-
-            on_find_block(CallbackResult(block))
+            self.on_create_block(rules, account, block)
+        elif block_hash is None:
+            # Find highest block, or create a new genesis block.
+            def on_find_highest_block(find_highest_block_result):
+                if find_highest_block_result.is_error:
+                    # Must be a genesis block
+                    self.on_create_block(rules, account, block)
+                    return
+                previous_block = find_highest_block_result.content
+                block.height = previous_block.height + 1
+                block.interval_id = previous_block.id if previous_block.interval_id is None else previous_block.interval_id
+                block.root_id = previous_block.id if previous_block.root_id is None else previous_block.root_id
+                block.chain = previous_block.chain
+                block.difficulty = previous_block.difficulty
+                block.previous_id = previous_block.id
+                block.previous_hash = previous_block.hash
+                self.check_difficulty(rules, account, block)
+            self.app.database.block.find_highest_block(on_find_highest_block)
         else:
-            raise NotImplementedError
+            raise NotImplementedError('building off of a specified hash not supported')
+
+    def check_difficulty(self, rules, account, block):
+        if not rules.is_difficulty_changing(block.height):
+            self.on_create_block(rules, account, block)
+            return
+        # Difficulty is changing...
+        if block.interval_id is None:
+            self.app.callbacks.on_error('Unable to recalculate difficulty, interval_id is None')
+            return
+        def on_find_interval_block(find_interval_block_result):
+            if find_interval_block_result.is_error:
+                self.app.callbacks.on_error(find_interval_block_result.content)
+                return
+            interval_block = find_interval_block_result.content
+            difficulty_duration = block.time - interval_block.time
+            block.interval_id = None
+            block.difficulty = rules.calculate_difficulty(block.difficulty, difficulty_duration)
+            self.on_create_block(rules, account, block)
+        self.app.database.block.find_block_by_id(block.interval_id, on_find_interval_block)
+
+
+    def on_create_block(self, rules, account, block):
+        self.check_chain(rules, account, block)
+
+
+    def check_chain(self, rules, account, block):
+        def on_find_highest_block_on_chain(highest_block_on_chain_result):
+            # If there's an error, it means the chain doesn't even exist, which is fine.
+            if not highest_block_on_chain_result.is_error:
+                highest_block = highest_block_on_chain_result.content
+                if block.height <= highest_block.height:
+                    # A chain is branching.
+                    block.chain = util.get_unique_key()
+                    block.root_id = block.previous_id
+            self.on_check_chain(rules, account, block)
+        self.app.database.block.find_highest_block_on_chain(block.chain, on_find_highest_block_on_chain)
+
+
+    def on_check_chain(self, rules, account, block):
+        self.get_meta(rules, account, block)
 
 
     def get_meta(self, rules, account, block):
-        def on_get_meta(get_meta_result):
-            if get_meta_result.is_error:
-                self.app.callbacks.on_error(get_meta_result.context)
-                return
-            block.meta = get_meta_result.content
-            self.get_events(rules, account, block)
-        self.app.database.meta.find_meta(on_get_meta)
+        def on_find_meta(find_meta_result):
+            block.meta = None if find_meta_result.is_error else find_meta_result.content.text_content
+            self.on_get_meta(rules, account, block)
+        self.app.database.meta.find_meta(on_find_meta)
+
+
+    def on_get_meta(self, rules, account, block):
+        self.get_events(rules, account, block)
 
 
     def get_events(self, rules, account, block):
@@ -136,6 +187,10 @@ class ProbeCommand(BaseCommand):
 
 
     def filter_events(self, rules, account, block, events):
+        if len(events) == 0:
+            self.generate_hash(rules, block)
+            return
+        # TODO: Actually filter events...
         raise NotImplementedError
 
 

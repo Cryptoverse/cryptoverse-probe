@@ -24,6 +24,9 @@ class BaseDatabaseHandler(object):
     def drop(self, model, done=None):
         raise NotImplementedError
 
+    def drop_all(self, done=None):
+        raise NotImplementedError
+
     def sync(self, model, done):
         raise NotImplementedError
 

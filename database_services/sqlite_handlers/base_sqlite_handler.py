@@ -59,6 +59,26 @@ class BaseSqliteHandler(BaseDatabaseHandler):
         result = result % tuple(target)
         return result
 
+    def drop(self, model, done=None):
+        connection, cursor = self.begin()
+        try:
+            cursor.execute('DELETE FROM %s WHERE rowid=?' % self.table_name, (model.id,))
+            connection.commit()
+            if done:
+                done(CallbackResult())
+        finally:
+            connection.close()
+
+    def drop_all(self, done=None):
+        connection, cursor = self.begin()
+        try:
+            cursor.execute('DELETE FROM %s' % self.table_name)
+            connection.commit()
+            if done:
+                done(CallbackResult())
+        finally:
+            connection.close()
+
     def count(self, done):
         connection, cursor = self.begin()
         try:

@@ -23,8 +23,8 @@ class BlockModel(BaseModel):
         self.meta = None
         self.meta_hash = None
 
-    def is_genesis(self):
-        return util.is_genesis_block(self.previous_hash)
+    def is_genesis(self, rules):
+        return rules.is_genesis_block(self.previous_hash)
 
     def is_valid(self, difficulty_fudge=0, difficulty_target_stripped=None, leading_zeros=None):
         """Takes the unpacked form of difficulty and verifies that the hash is less than it.

@@ -68,11 +68,11 @@ class ProbeCommand(BaseCommand):
             # If genesis...
             block = BlockModel()
 
-            block.hash = util.EMPTY_TARGET
+            block.hash = rules.empty_target
             block.nonce = 0
-            block.previous_hash = util.EMPTY_TARGET
+            block.previous_hash = rules.empty_target
             block.height = 0
-            block.difficulty = util.difficultyStart()
+            block.difficulty = rules.difficulty_start
             block.time = util.get_time()
             block.events = []
             block.version = rules.version
@@ -114,7 +114,7 @@ class ProbeCommand(BaseCommand):
         
         block.events.append(reward_event)
 
-        if block.is_genesis():
+        if block.is_genesis(rules):
             self.generate_hash(rules, block)
             return
         
@@ -172,7 +172,7 @@ class ProbeCommand(BaseCommand):
                 elapsed_minutes = (now - started).total_seconds() / 60
                 print '\tProbing at %.0f hashes per second, %.1f minutes elapsed...' % (hashes_per_second, elapsed_minutes)
             current_nonce += 1
-            if util.MAXIMUM_NONCE <= current_nonce:
+            if rules.maximum_nonce <= current_nonce:
                 current_nonce = 0
                 block.time = util.get_time()
                 log_prefix = block.get_concat(False)
@@ -209,6 +209,7 @@ class ProbeCommand(BaseCommand):
             self.app.database.block.write(block, on_write_block)
         self.app.database.block.find_block_by_hash(block.hash, on_check_unique)
 
+
     def on_cached(self, block):
         def on_recent_nodes(recent_nodes_result):
             if recent_nodes_result.is_error:
@@ -234,6 +235,7 @@ class ProbeCommand(BaseCommand):
                 node_successes.append(current_node)
             self.post_to_nodes(block, nodes, node_successes)
         self.app.remote.post_block(current_node, block, on_post)
+
 
     def on_post_block(self, success_count):
         # TODO: call output, instead of just printing...

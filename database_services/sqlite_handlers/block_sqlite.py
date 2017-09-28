@@ -91,6 +91,30 @@ class BlockSqlite(BaseSqliteHandler):
         finally:
             connection.close()
 
+    def find_block_by_hash_fragment(self, block_hash_fragment, done):
+        if block_hash_fragment is None or block_hash_fragment == '':
+            done(CallbackResult('Cannot search for an empty or None hash fragment', False))
+            return
+        connection, cursor = self.begin()
+        try:
+            query_text = 'SELECT rowid, * FROM blocks WHERE hash LIKE %s' % ("'%" + block_hash_fragment + "%'")
+            results = cursor.execute(query_text).fetchall()
+            closest_result = None
+            closest_begin_index = 9999
+            for result in results:
+                result_hash = result[1]
+                result_begin_index = result_hash.find(block_hash_fragment)
+                if result_begin_index < closest_begin_index:
+                    closest_result = result
+                    closest_begin_index = result_begin_index
+            if closest_result:
+                model = self.model_from_request(closest_result)
+                done(CallbackResult(model))
+            else:
+                done(CallbackResult('Block with hash fragment %s not found' % block_hash_fragment, False))
+        finally:
+            connection.close()
+
     def find_highest_block(self, done):
         connection, cursor = self.begin()
         try:

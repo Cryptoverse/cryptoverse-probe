@@ -20,15 +20,27 @@ class ProbeCommand(BaseCommand):
             self.COMMAND_NAME,
             description = 'Probes for a new block and posts the results to recent nodes',
             parameter_usages = [
-                'None: probes for a new block ontop of the highest block in the chain'
+                'None: probes for a new block ontop of the highest block in the chain',
+                '"-p <hash fragment>" to build off of the parent block with the closest matching hash'
             ],
             command_handlers = [
-                self.get_handler(None, self.on_probe)
+                self.get_handler(None, self.on_probe),
+                self.get_handler('-p', self.on_probe_hash, 1)
             ]
         )
 
+    def on_probe_hash(self, block_hash_fragment):
+        if block_hash_fragment is None or block_hash_fragment == '':
+            self.app.callbacks.on_error('A hash must be specified to build off of')
+            return
+        def on_find_block_by_hash_fragment(find_block_by_hash_fragment_result):
+            if find_block_by_hash_fragment_result.is_error:
+                self.app.callbacks.on_error(find_block_by_hash_fragment_result.content)
+                return
+            self.on_probe(find_block_by_hash_fragment_result.content.hash)
+        self.app.database.block.find_block_by_hash_fragment(block_hash_fragment, on_find_block_by_hash_fragment)
 
-    def on_probe(self):
+    def on_probe(self, block_hash=None):
         def on_sync(sync_result):
             if sync_result.is_error:
                 self.app.callbacks.on_error(sync_result.content)
@@ -40,7 +52,7 @@ class ProbeCommand(BaseCommand):
                 if get_account_result.content is None:
                     self.app.callbacks.on_error('No active account')
                     return
-                self.get_rules(get_account_result.content, None)
+                self.get_rules(get_account_result.content, block_hash)
             self.app.database.account.find_account_active(on_get_account)
         self.app.commands.get_command(SyncCommand.COMMAND_NAME).synchronize(on_sync)
 
@@ -78,18 +90,28 @@ class ProbeCommand(BaseCommand):
                     # Must be a genesis block
                     self.on_create_block(rules, account, block)
                     return
-                previous_block = find_highest_block_result.content
-                block.height = previous_block.height + 1
-                block.interval_id = previous_block.id if previous_block.interval_id is None else previous_block.interval_id
-                block.root_id = previous_block.id if previous_block.root_id is None else previous_block.root_id
-                block.chain = previous_block.chain
-                block.difficulty = previous_block.difficulty
-                block.previous_id = previous_block.id
-                block.previous_hash = previous_block.hash
-                self.check_difficulty(rules, account, block)
+                self.create_block_from_previous(rules, account, block, find_highest_block_result.content)
             self.app.database.block.find_highest_block(on_find_highest_block)
         else:
-            raise NotImplementedError('building off of a specified hash not supported')
+            def on_find_block(find_block_result):
+                if find_block_result.is_error:
+                    self.app.callbacks.on_error(find_block_result.content)
+                    return
+                self.create_block_from_previous(rules, account, block, find_block_result.content)
+            self.app.database.block.find_block_by_hash(block_hash, on_find_block)
+
+    def create_block_from_previous(self, rules, account, block, previous_block):
+        if previous_block is None:
+            self.app.callbacks.on_error('Cannot probe ontop of a None block')
+            return
+        block.height = previous_block.height + 1
+        block.interval_id = previous_block.id if previous_block.interval_id is None else previous_block.interval_id
+        block.root_id = previous_block.id if previous_block.root_id is None else previous_block.root_id
+        block.chain = previous_block.chain
+        block.difficulty = previous_block.difficulty
+        block.previous_id = previous_block.id
+        block.previous_hash = previous_block.hash
+        self.check_difficulty(rules, account, block)
 
     def check_difficulty(self, rules, account, block):
         if not rules.is_difficulty_changing(block.height):
@@ -294,4 +316,4 @@ class ProbeCommand(BaseCommand):
 
     def on_post_block(self, success_count):
         # TODO: call output, instead of just printing...
-        print 'posted successfully to %s nodes' % success_count
+        self.app.callbacks.on_output('posted successfully to %s nodes' % success_count)

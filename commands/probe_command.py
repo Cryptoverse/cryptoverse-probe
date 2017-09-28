@@ -21,13 +21,20 @@ class ProbeCommand(BaseCommand):
             description = 'Probes for a new block and posts the results to recent nodes',
             parameter_usages = [
                 'None: probes for a new block ontop of the highest block in the chain',
+                '"-g" to create a new genesis block',
                 '"-p <hash fragment>" to build off of the parent block with the closest matching hash'
             ],
             command_handlers = [
                 self.get_handler(None, self.on_probe),
+                self.get_handler('-g', self.on_probe_genesis),
                 self.get_handler('-p', self.on_probe_hash, 1)
             ]
         )
+
+
+    def on_probe_genesis(self):
+        self.on_probe(is_genesis=True)
+
 
     def on_probe_hash(self, block_hash_fragment):
         if block_hash_fragment is None or block_hash_fragment == '':
@@ -40,7 +47,8 @@ class ProbeCommand(BaseCommand):
             self.on_probe(find_block_by_hash_fragment_result.content.hash)
         self.app.database.block.find_block_by_hash_fragment(block_hash_fragment, on_find_block_by_hash_fragment)
 
-    def on_probe(self, block_hash=None):
+
+    def on_probe(self, block_hash=None, is_genesis=False):
         def on_sync(sync_result):
             if sync_result.is_error:
                 self.app.callbacks.on_error(sync_result.content)
@@ -52,12 +60,12 @@ class ProbeCommand(BaseCommand):
                 if get_account_result.content is None:
                     self.app.callbacks.on_error('No active account')
                     return
-                self.get_rules(get_account_result.content, block_hash)
+                self.get_rules(get_account_result.content, block_hash, is_genesis)
             self.app.database.account.find_account_active(on_get_account)
         self.app.commands.get_command(SyncCommand.COMMAND_NAME).synchronize(on_sync)
 
 
-    def get_rules(self, account, block_hash):
+    def get_rules(self, account, block_hash, is_genesis):
         def on_find_rules(find_rules_result):
             if find_rules_result.is_error:
                 self.app.callbacks.on_error(find_rules_result.content)
@@ -65,7 +73,7 @@ class ProbeCommand(BaseCommand):
             if find_rules_result.content is None:
                 self.app.callbacks.on_error('No rules have been set, unable to probe')
                 return
-            self.create_block(find_rules_result.content, account, block_hash)
+            self.create_block(find_rules_result.content, account, block_hash, is_genesis)
         self.app.database.rules.find_rules(on_find_rules)
 
 

@@ -31,6 +31,7 @@ class ProbeCommand(BaseCommand):
             ]
         )
 
+    # Commands
 
     def on_probe_genesis(self):
         self.on_probe(is_genesis=True)
@@ -64,6 +65,72 @@ class ProbeCommand(BaseCommand):
             self.app.database.account.find_account_active(on_get_account)
         self.app.commands.get_command(SyncCommand.COMMAND_NAME).synchronize(on_sync)
 
+    # Shared
+
+    def check_chain(self, done, block):
+        def on_find_highest_block_on_chain(highest_block_on_chain_result):
+            # If there's an error, it means the chain doesn't even exist, which is fine.
+            if not highest_block_on_chain_result.is_error:
+                highest_block = highest_block_on_chain_result.content
+                if block.height <= highest_block.height:
+                    # A chain is branching.
+                    block.chain = util.get_unique_key()
+                    block.root_id = block.previous_id
+            done(CallbackResult(block))
+        self.app.database.block.find_highest_block_on_chain(block.chain, on_find_highest_block_on_chain)
+
+    def cache_block(self, done, block):
+        def on_check_unique(check_unique_result):
+            if not check_unique_result.is_error:
+                done(CallbackResult(block))
+                return
+            # Block and data needs to be cached.
+            def on_write_block(write_block_result):
+                if write_block_result.is_error:
+                    done(write_block_result)
+                    return
+                block = write_block_result.content
+                def on_write_block_data(write_block_data_result):
+                    if write_block_data_result.is_error:
+                        done(write_block_data_result)
+                        return
+                    done(CallbackResult(block))
+                block_data = BlockDataModel()
+                block_data.block_id = block.id
+                block_data.previous_block_id = block.previous_id
+                block_data.uri = 'data_json' # Not really used at the moment, will eventually lead to a path on disk
+                block_data.data = json_dump(block.get_json())
+                self.app.database.block_data.write(block_data, on_write_block_data)
+            self.app.database.block.write(block, on_write_block)
+        self.app.database.block.find_block_by_hash(block.hash, on_check_unique)
+
+    def post_to_nodes(self, done, block):
+        def on_recent_nodes(recent_nodes_result):
+            if recent_nodes_result.is_error:
+                self.app.callbacks.on_error(recent_nodes_result.content)
+                return
+            self.on_post_to_nodes(done, block, recent_nodes_result.content)
+        self.app.database.node.find_recent_nodes(on_recent_nodes)
+
+
+    def on_post_to_nodes(self, done, block, nodes, node_successes=None):
+        if node_successes is None:
+            node_successes = []
+        
+        if len(nodes) == 0:
+            done(CallbackResult(len(node_successes)))
+            return
+
+        current_node = nodes[0]
+        nodes = nodes[1:]
+
+        def on_post(post_result):
+            if not post_result.is_error:
+                node_successes.append(current_node)
+            self.on_post_to_nodes(done, block, nodes, node_successes)
+        self.app.remote.post_block(current_node, block, on_post)
+
+    # Probe
 
     def get_rules(self, account, block_hash, is_genesis):
         def on_find_rules(find_rules_result):
@@ -90,13 +157,13 @@ class ProbeCommand(BaseCommand):
         block.chain = util.get_unique_key()
         if is_genesis:
             # If genesis...
-            self.on_create_block(rules, account, block)
+            self.get_meta(rules, account, block)
         elif block_hash is None:
             # Find highest block, or create a new genesis block.
             def on_find_highest_block(find_highest_block_result):
                 if find_highest_block_result.is_error:
                     # Must be a genesis block
-                    self.on_create_block(rules, account, block)
+                    self.get_meta(rules, account, block)
                     return
                 self.create_block_from_previous(rules, account, block, find_highest_block_result.content)
             self.app.database.block.find_highest_block(on_find_highest_block)
@@ -107,6 +174,7 @@ class ProbeCommand(BaseCommand):
                     return
                 self.create_block_from_previous(rules, account, block, find_block_result.content)
             self.app.database.block.find_block_by_hash(block_hash, on_find_block)
+
 
     def create_block_from_previous(self, rules, account, block, previous_block):
         if previous_block is None:
@@ -121,9 +189,10 @@ class ProbeCommand(BaseCommand):
         block.previous_hash = previous_block.hash
         self.check_difficulty(rules, account, block)
 
+
     def check_difficulty(self, rules, account, block):
         if not rules.is_difficulty_changing(block.height):
-            self.on_create_block(rules, account, block)
+            self.get_meta(rules, account, block)
             return
         # Difficulty is changing...
         if block.interval_id is None:
@@ -137,40 +206,15 @@ class ProbeCommand(BaseCommand):
             difficulty_duration = block.time - interval_block.time
             block.interval_id = None
             block.difficulty = rules.calculate_difficulty(block.difficulty, difficulty_duration)
-            self.on_create_block(rules, account, block)
+            self.get_meta(rules, account, block)
         self.app.database.block.find_block_by_id(block.interval_id, on_find_interval_block)
-
-
-    def on_create_block(self, rules, account, block):
-        self.check_chain(rules, account, block)
-
-
-    def check_chain(self, rules, account, block):
-        def on_find_highest_block_on_chain(highest_block_on_chain_result):
-            # If there's an error, it means the chain doesn't even exist, which is fine.
-            if not highest_block_on_chain_result.is_error:
-                highest_block = highest_block_on_chain_result.content
-                if block.height <= highest_block.height:
-                    # A chain is branching.
-                    block.chain = util.get_unique_key()
-                    block.root_id = block.previous_id
-            self.on_check_chain(rules, account, block)
-        self.app.database.block.find_highest_block_on_chain(block.chain, on_find_highest_block_on_chain)
-
-
-    def on_check_chain(self, rules, account, block):
-        self.get_meta(rules, account, block)
 
 
     def get_meta(self, rules, account, block):
         def on_find_meta(find_meta_result):
             block.meta = None if find_meta_result.is_error else find_meta_result.content.text_content
-            self.on_get_meta(rules, account, block)
+            self.get_events(rules, account, block)
         self.app.database.meta.find_meta(on_find_meta)
-
-
-    def on_get_meta(self, rules, account, block):
-        self.get_events(rules, account, block)
 
 
     def get_events(self, rules, account, block):
@@ -263,65 +307,20 @@ class ProbeCommand(BaseCommand):
                 log_prefix = block.get_concat(False)
             tries += 1
         if found:
-            self.on_generate_hash(block)
+            def on_check_chain(check_chain_result):
+                if check_chain_result.is_error:
+                    self.app.callbacks.on_error(check_chain_result.content)
+                    return
+                def on_post_to_nodes(post_to_nodes_result):
+                    if post_to_nodes_result.is_error:
+                        self.app.callbacks.on_error(post_to_nodes_result.content)
+                        return
+                    self.on_done_probing(post_to_nodes_result.content)
+                self.post_to_nodes(on_post_to_nodes, block)
+            self.cache_block(on_check_chain, block)
         else:
             self.app.callbacks.on_error('Unable to probe a new starlog')
 
-
-    def on_generate_hash(self, block):
-        def on_check_unique(check_unique_result):
-            if not check_unique_result.is_error:
-                self.on_cached(block)
-                return
-            # Block and data needs to be cached.
-            def on_write_block(write_block_result):
-                if write_block_result.is_error:
-                    self.app.callbacks.on_error(write_block_result.content)
-                    return
-                block = write_block_result.content
-                def on_write_block_data(write_block_data_result):
-                    if write_block_data_result.is_error:
-                        self.app.callbacks.on_error(write_block_data_result.content)
-                        return
-                    self.on_cached(block)
-                block_data = BlockDataModel()
-                block_data.block_id = block.id
-                block_data.previous_block_id = block.previous_id
-                block_data.uri = 'data_json' # Not really used at the moment, will eventually lead to a path on disk
-                block_data.data = json_dump(block.get_json())
-                self.app.database.block_data.write(block_data, on_write_block_data)
-                
-            self.app.database.block.write(block, on_write_block)
-        self.app.database.block.find_block_by_hash(block.hash, on_check_unique)
-
-
-    def on_cached(self, block):
-        def on_recent_nodes(recent_nodes_result):
-            if recent_nodes_result.is_error:
-                self.app.callbacks.on_error(recent_nodes_result.content)
-                return
-            self.post_to_nodes(block, recent_nodes_result.content)
-        self.app.database.node.find_recent_nodes(on_recent_nodes)
-
-
-    def post_to_nodes(self, block, nodes, node_successes=None):
-        if node_successes is None:
-            node_successes = []
-        
-        if len(nodes) == 0:
-            self.on_post_block(len(node_successes))
-            return
-
-        current_node = nodes[0]
-        nodes = nodes[1:]
-
-        def on_post(post_result):
-            if not post_result.is_error:
-                node_successes.append(current_node)
-            self.post_to_nodes(block, nodes, node_successes)
-        self.app.remote.post_block(current_node, block, on_post)
-
-
-    def on_post_block(self, success_count):
+    def on_done_probing(self, success_count):
         # TODO: call output, instead of just printing...
         self.app.callbacks.on_output('posted successfully to %s nodes' % success_count)

@@ -1,7 +1,7 @@
 from json import dumps as json_dump
 from datetime import datetime
 from commands.base_command import BaseCommand
-from commands.sync_command import SyncCommand
+import commands
 from callback_result import CallbackResult
 from models.block_model import BlockModel
 from models.event_model import EventModel
@@ -63,7 +63,7 @@ class ProbeCommand(BaseCommand):
                     return
                 self.get_rules(get_account_result.content, block_hash, is_genesis)
             self.app.database.account.find_account_active(on_get_account)
-        self.app.commands.get_command(SyncCommand.COMMAND_NAME).synchronize(on_sync)
+        self.app.commands.get_command(commands.sync_command.SyncCommand.COMMAND_NAME).synchronize(on_sync)
 
     # Shared
 
@@ -79,30 +79,70 @@ class ProbeCommand(BaseCommand):
             done(CallbackResult(block))
         self.app.database.block.find_highest_block_on_chain(block.chain, on_find_highest_block_on_chain)
 
-    def cache_block(self, done, block):
+
+    def cache_blocks(self, done, blocks, rules):
+        if len(blocks) == 0:
+            done(CallbackResult())
+            return
+        current_block = blocks[0]
+        blocks = blocks[1:]
+
+        def on_cache(cache_result):
+            self.cache_blocks(done, blocks, rules)
+        self.cache_block(on_cache, current_block, rules)
+
+
+    def cache_block(self, done, block, rules):
         def on_check_unique(check_unique_result):
             if not check_unique_result.is_error:
-                done(CallbackResult(block))
+                done(CallbackResult(check_unique_result.content))
                 return
-            # Block and data needs to be cached.
-            def on_write_block(write_block_result):
-                if write_block_result.is_error:
-                    done(write_block_result)
+            def on_check_previous(check_previous_result):
+                if check_previous_result.is_error:
+                    done(check_previous_result)
                     return
-                block = write_block_result.content
-                def on_write_block_data(write_block_data_result):
-                    if write_block_data_result.is_error:
-                        done(write_block_data_result)
+                previous_block = check_previous_result.content
+                if previous_block is None:
+                    block.chain = util.get_unique_key()
+                else:
+                    block.previous_id = previous_block.id
+                    block.root_id = previous_block.id if previous_block.is_genesis(rules) else previous_block.root_id
+                    block.interval_id = previous_block.id if previous_block.interval_id is None else previous_block.interval_id
+                    block.chain = previous_block.chain
+                
+                def on_check_chain(check_chain_result):
+                    if check_chain_result.is_error:
+                        done(check_chain_result)
                         return
-                    done(CallbackResult(block))
-                block_data = BlockDataModel()
-                block_data.block_id = block.id
-                block_data.previous_block_id = block.previous_id
-                block_data.uri = 'data_json' # Not really used at the moment, will eventually lead to a path on disk
-                block_data.data = json_dump(block.get_json())
-                self.app.database.block_data.write(block_data, on_write_block_data)
-            self.app.database.block.write(block, on_write_block)
+                    block = check_chain_result.content
+                    if previous_block is not None and block.chain != previous_block.chain:
+                        block.root_id = previous_block.id
+
+                    # Block and data needs to be cached.
+                    def on_write_block(write_block_result):
+                        if write_block_result.is_error:
+                            done(write_block_result)
+                            return
+                        block = write_block_result.content
+                        def on_write_block_data(write_block_data_result):
+                            if write_block_data_result.is_error:
+                                done(write_block_data_result)
+                                return
+                            done(CallbackResult(block))
+                        block_data = BlockDataModel()
+                        block_data.block_id = block.id
+                        block_data.previous_block_id = block.previous_id
+                        block_data.uri = 'data_json' # Not really used at the moment, will eventually lead to a path on disk
+                        block_data.data = json_dump(block.get_json())
+                        self.app.database.block_data.write(block_data, on_write_block_data)
+                    self.app.database.block.write(block, on_write_block)
+                self.check_chain(on_check_chain, block)
+            if block.is_genesis(rules):
+                on_check_previous(CallbackResult())
+            else:
+                self.app.database.block.find_block_by_hash(block.previous_hash, on_check_previous)
         self.app.database.block.find_block_by_hash(block.hash, on_check_unique)
+
 
     def post_to_nodes(self, done, block):
         def on_recent_nodes(recent_nodes_result):
@@ -128,7 +168,7 @@ class ProbeCommand(BaseCommand):
             if not post_result.is_error:
                 node_successes.append(current_node)
             self.on_post_to_nodes(done, block, nodes, node_successes)
-        self.app.remote.post_block(current_node, block, on_post)
+        self.app.remote.post_block(current_node, on_post, block)
 
     # Probe
 
@@ -307,17 +347,18 @@ class ProbeCommand(BaseCommand):
                 log_prefix = block.get_concat(False)
             tries += 1
         if found:
-            def on_check_chain(check_chain_result):
-                if check_chain_result.is_error:
-                    self.app.callbacks.on_error(check_chain_result.content)
+            def on_cache_block(cache_block_result):
+                if cache_block_result.is_error:
+                    self.app.callbacks.on_error(cache_block_result.content)
                     return
+                block = cache_block_result.content
                 def on_post_to_nodes(post_to_nodes_result):
                     if post_to_nodes_result.is_error:
                         self.app.callbacks.on_error(post_to_nodes_result.content)
                         return
                     self.on_done_probing(post_to_nodes_result.content)
                 self.post_to_nodes(on_post_to_nodes, block)
-            self.cache_block(on_check_chain, block)
+            self.cache_block(on_cache_block, block, rules)
         else:
             self.app.callbacks.on_error('Unable to probe a new starlog')
 

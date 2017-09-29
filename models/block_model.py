@@ -193,20 +193,20 @@ class BlockModel(BaseModel):
 
 
     def set_from_json(self, block_json):
-        self.hash = block_json['hash']
-        self.nonce = block_json['nonce']
-        self.previous_hash = block_json['previous_hash']
-        self.height = block_json['height']
-        self.size = block_json['size']
-        self.version = block_json['version']
-        self.difficulty = block_json['difficulty']
-        self.time = block_json['time']
-        self.events_hash = block_json['events_hash']
-        self.meta = block_json['meta']
-        self.meta_hash = block_json['meta_hash']
+        self.hash = block_json.get('hash')
+        self.nonce = block_json.get('nonce')
+        self.previous_hash = block_json.get('previous_hash')
+        self.height = block_json.get('height')
+        self.size = block_json.get('size')
+        self.version = block_json.get('version')
+        self.difficulty = block_json.get('difficulty')
+        self.time = block_json.get('time')
+        self.events_hash = block_json.get('events_hash')
+        self.meta = block_json.get('meta')
+        self.meta_hash = block_json.get('meta_hash')
         
         self.events = []
-        for event in block_json['events']:
+        for event in block_json.get('events', []):
             current_event = EventModel()
             current_event.set_from_json(event)
             self.events.append(current_event)

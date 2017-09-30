@@ -259,6 +259,8 @@ class ProbeCommand(BaseCommand):
 
     def get_events(self, rules, account, block):
         reward_event = EventModel()
+        reward_event.key = util.get_unique_key()
+        reward_event.version = rules.event_version
         reward_event.index = 0
         reward_event.fleet = account.get_fleet()
         # TODO: Enumify this somewhere...
@@ -275,6 +277,7 @@ class ProbeCommand(BaseCommand):
         reward_output.model = self.app.blueprints.get_default_vessel()
 
         reward_event.outputs.append(reward_output)
+        reward_event.assign_hash()
         reward_event.generate_signature(account.private_key)
         
         block.events.append(reward_event)

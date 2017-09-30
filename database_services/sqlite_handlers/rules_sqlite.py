@@ -18,7 +18,8 @@ class RulesSqlite(BaseSqliteHandler):
                 'difficulty_interval',
                 'difficulty_duration',
                 'cartesian_digits',
-                'probe_reward'
+                'probe_reward',
+                'event_version'
             ]
         )
 
@@ -37,10 +38,11 @@ class RulesSqlite(BaseSqliteHandler):
                 model.difficulty_interval,
                 model.difficulty_duration,
                 model.cartesian_digits,
-                model.probe_reward
+                model.probe_reward,
+                model.event_version
             )
             if model.id is None:
-                cursor.execute('INSERT INTO rules VALUES (?,?,?,?,?,?,?,?,?,?)', values)
+                cursor.execute('INSERT INTO rules VALUES (?,?,?,?,?,?,?,?,?,?,?)', values)
                 model.id = cursor.lastrowid
             else:
                 cursor.execute('UPDATE rules SET %s WHERE rowid=?' % self.column_updates, values + (model.id,))
@@ -92,4 +94,5 @@ class RulesSqlite(BaseSqliteHandler):
         model.difficulty_duration = result[8]
         model.cartesian_digits = result[9]
         model.probe_reward = result[10]
+        model.event_version = result[11]
         return model

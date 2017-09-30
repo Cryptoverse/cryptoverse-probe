@@ -20,6 +20,7 @@ class WebRemote(BaseRemote):
         try:
             json = result.content
             rules.version = json['version']
+            rules.event_version = json['event_version']
             rules.jump_cost_min = json['jump_cost_min']
             rules.jump_cost_max = json['jump_cost_max']
             rules.jump_distance_max = json['jump_distance_max']

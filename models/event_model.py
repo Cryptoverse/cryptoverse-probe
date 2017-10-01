@@ -40,9 +40,11 @@ class EventModel(BaseModel):
             raise ValueError('version cannot be None')
         result = '%s%s%s%s%s' % (self.version, self.key, self.fleet.get_hash(), self.fleet.public_key, self.event_type)
         for current_input in sorted(self.inputs, key=lambda x: x.index):
+            # Unless more than just an input hash is used, there's no need to assign hashes.
             result += current_input.get_concat()
         for current_output in sorted(self.outputs, key=lambda x: x.index):
-            result += current_output.get_concat()
+            # Outputs are more complicated, so we hash them first.
+            result += current_output.assign_hash()
         return result
 
     def generate_signature(self, private_key):

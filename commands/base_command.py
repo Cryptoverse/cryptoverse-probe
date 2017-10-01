@@ -47,5 +47,5 @@ class BaseCommand(object):
             return
         handler[1](*args[1:])
 
-    def get_handler(self, name, handler, parameter_count = 0):
+    def get_handler(self, name, handler, parameter_count=0):
         return (name, handler, parameter_count)

@@ -1,3 +1,4 @@
+import json
 from models.base_model import BaseModel
 
 class BlockDataModel(BaseModel):
@@ -11,7 +12,10 @@ class BlockDataModel(BaseModel):
         self.data = None
 
     def get_json(self):
-        raise NotImplementedError
+        if self.uri == 'data_json':
+            return json.loads(self.data)
+        else:
+            raise NotImplementedError
 
     def get_pretty_content(self):
         content = super(BlockDataModel, self).get_pretty_content()

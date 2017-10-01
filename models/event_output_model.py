@@ -1,6 +1,7 @@
 from models.base_model import BaseModel
 from models.fleet_model import FleetModel
 from models.event_outputs.vessel_model import VesselModel
+import util
 
 class EventOutputModel(BaseModel):
 
@@ -10,8 +11,20 @@ class EventOutputModel(BaseModel):
         self.fleet = None
         self.output_type = None
         self.key = None
+        self.hash = None
         self.location = None
         self.model = None
+
+
+    def assign_hash(self):
+        """Calculates and assigns the hash of this event output.
+
+        Returns:
+            str: Sha256 hash of this event output.
+        """
+        self.hash = util.sha256(self.get_concat())
+        return self.hash
+
 
     def get_concat(self):
         if self.fleet is None:
@@ -29,12 +42,14 @@ class EventOutputModel(BaseModel):
         result += self.model.get_concat()
         return result
 
+
     def get_json(self):
         return {
             'index': self.index,
             'model': self.model.get_json(),
             'fleet_hash': self.fleet.get_hash(),
             'key': self.key,
+            'hash': self.hash,
             'location': self.location,
             'type': self.output_type
         }
@@ -46,6 +61,7 @@ class EventOutputModel(BaseModel):
         self.fleet.public_key = event_output_json['fleet_hash']
         self.output_type = event_output_json['type']
         self.key = event_output_json['key']
+        self.hash = event_output_json['hash']
         self.location = event_output_json['location']
         output_model_json = event_output_json['model']
         if output_model_json is None:
@@ -64,6 +80,7 @@ class EventOutputModel(BaseModel):
         content += self.get_pretty_entry('fleet', self.fleet)
         content += self.get_pretty_entry('output_type', self.output_type)
         content += self.get_pretty_entry('key', self.key)
+        content += self.get_pretty_entry('hash', self.hash)
         content += self.get_pretty_entry('location', self.location)
         content += self.get_pretty_entry('model', self.model)
         return content

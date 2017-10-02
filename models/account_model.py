@@ -12,7 +12,7 @@ class AccountModel(BaseModel):
         self.public_key = None
 
     def get_fleet_name(self):
-        return util.get_fleet_hash_name(self.public_key)
+        return self.get_fleet().get_fleet_name()
     
     def get_fleet(self):
         fleet = FleetModel()

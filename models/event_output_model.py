@@ -58,7 +58,7 @@ class EventOutputModel(BaseModel):
     def set_from_json(self, event_output_json):
         self.index = event_output_json['index']
         self.fleet = FleetModel()
-        self.fleet.public_key = event_output_json['fleet_hash']
+        self.fleet.hash = event_output_json['fleet_hash']
         self.output_type = event_output_json['type']
         self.key = event_output_json['key']
         self.hash = event_output_json['hash']

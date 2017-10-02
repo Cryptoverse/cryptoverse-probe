@@ -15,14 +15,14 @@ class EventOutputShared(BaseDatabaseHandler):
                             done, 
                             block,
                             model_types, 
-                            fleets):
-        self.on_find_active_outputs(done, block, model_types, fleets, [], [])
+                            fleet_hashes):
+        self.on_find_active_outputs(done, block, model_types, fleet_hashes, [], [])
 
     def on_find_active_outputs(self,
                                done,
                                block,
                                model_types, 
-                               fleets,
+                               fleet_hashes,
                                used_outputs, 
                                active_outputs):
         if block is None:
@@ -39,8 +39,8 @@ class EventOutputShared(BaseDatabaseHandler):
                     used_outputs.append(event_input.hash)
                 # Filter outputs that have been used.
                 event_outputs = [x for x in event.outputs if x.hash not in used_outputs]
-                if fleets is not None:
-                    event_outputs = [x for x in event_outputs if x.fleet.get_hash() in fleets]
+                if fleet_hashes is not None:
+                    event_outputs = [x for x in event_outputs if x.fleet.get_hash() in fleet_hashes]
                 if model_types is not None:
                     event_outputs = [x for x in event_outputs if x.model.model_type in model_types]
                 active_outputs.extend(event_outputs)
@@ -48,7 +48,7 @@ class EventOutputShared(BaseDatabaseHandler):
                 if find_previous_block_result.is_error:
                     done(find_previous_block_result)
                     return
-                self.on_find_active_outputs(done, find_previous_block_result.content, model_types, fleets, used_outputs, active_outputs)
+                self.on_find_active_outputs(done, find_previous_block_result.content, model_types, fleet_hashes, used_outputs, active_outputs)
             if block.previous_id is None:
                 on_find_previous_block(CallbackResult(None))
             else:

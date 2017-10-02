@@ -7,13 +7,14 @@ class FleetModel(BaseModel):
         super(FleetModel, self).__init__()
         self.name = None
         self.public_key = None
+        self.hash = None
 
     def set_from_account(self, account):
         self.name = account.name
         self.public_key = account.public_key
 
     def get_hash(self):
-        return util.sha256(self.public_key)
+        return self.hash if self.public_key is None else util.sha256(self.public_key)
 
     def get_fleet_name(self):
         return '(%s)' % util.get_shortened_hash(self.get_hash(), strip_zeros=False)

@@ -25,22 +25,27 @@ class FleetsCommand(BaseCommand):
     # Commands
 
     def on_list_all(self):
-        def on_find_highest_block(find_highest_block_result):
-            if find_highest_block_result.is_error:
-                self.app.callbacks.on_error(find_highest_block_result.content)
+        def on_find_account(find_account_result):
+            if find_account_result.is_error:
+                self.app.callbacks.on_error(find_account_result.content)
                 return
-            block = find_highest_block_result.content
-            def on_find_active_outputs(find_active_outputs_results):
-                if find_active_outputs_results.is_error:
-                    self.app.callbacks.on_error(find_active_outputs_results.content)
+            fleets = [ find_account_result.content.get_fleet().get_hash() ]
+            def on_find_highest_block(find_highest_block_result):
+                if find_highest_block_result.is_error:
+                    self.app.callbacks.on_error(find_highest_block_result.content)
                     return
-                self.app.callbacks.on_output(self.concat_vessels(find_active_outputs_results.content, block.hash))
-            self.app.database.event_output.find_active_outputs(on_find_active_outputs, 
-                                                               block,
-                                                               ['vessel'],
-                                                               None)
-        self.app.database.block.find_highest_block(on_find_highest_block)
-
+                block = find_highest_block_result.content
+                def on_find_active_outputs(find_active_outputs_results):
+                    if find_active_outputs_results.is_error:
+                        self.app.callbacks.on_error(find_active_outputs_results.content)
+                        return
+                    self.app.callbacks.on_output(self.concat_vessels(find_active_outputs_results.content, block.hash))
+                self.app.database.event_output.find_active_outputs(on_find_active_outputs, 
+                                                                block,
+                                                                ['vessel'],
+                                                                fleets)
+            self.app.database.block.find_highest_block(on_find_highest_block)
+        self.app.database.account.find_account_active(on_find_account)
 
     def on_list_in_system(self, system_hash_fragment):
         raise NotImplementedError

@@ -1,4 +1,5 @@
 from database_services.base_database import BaseDatabase
+from database_services.shared_handlers.event_output_shared import EventOutputShared
 from database_services.sqlite_handlers.command_history_sqlite import CommandHistorySqlite
 from database_services.sqlite_handlers.account_sqlite import AccountSqlite
 from database_services.sqlite_handlers.meta_sqlite import MetaSqlite
@@ -12,11 +13,12 @@ class SqliteDatabase(BaseDatabase):
     def __init__(self, app):
         super(SqliteDatabase, self).__init__(
             app,
-            command_history = CommandHistorySqlite(),
-            account = AccountSqlite(),
-            meta = MetaSqlite(),
-            node = NodeSqlite(),
-            rules = RulesSqlite(),
-            block = BlockSqlite(),
-            block_data = BlockDataSqlite()
+            event_output = EventOutputShared(app),
+            command_history = CommandHistorySqlite(app),
+            account = AccountSqlite(app),
+            meta = MetaSqlite(app),
+            node = NodeSqlite(app),
+            rules = RulesSqlite(app),
+            block = BlockSqlite(app),
+            block_data = BlockDataSqlite(app)
         )

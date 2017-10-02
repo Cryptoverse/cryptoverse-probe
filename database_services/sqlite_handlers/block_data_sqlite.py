@@ -4,8 +4,9 @@ from models.block_data_model import BlockDataModel
 
 class BlockDataSqlite(BaseSqliteHandler):
 
-    def __init__(self):
+    def __init__(self, app):
         super(BlockDataSqlite, self).__init__(
+            app,
             BlockDataModel,
             'block_data',
             [

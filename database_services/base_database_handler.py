@@ -1,6 +1,7 @@
 class BaseDatabaseHandler(object):
 
-    def __init__(self, model_type):
+    def __init__(self, app, model_type):
+        self.app = app
         self.model_type = model_type
 
     def initialize(self, done, rebuild=False):

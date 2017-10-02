@@ -4,8 +4,9 @@ from models.meta_model import MetaModel
 
 class MetaSqlite(BaseSqliteHandler):
 
-    def __init__(self):
+    def __init__(self, app):
         super(MetaSqlite, self).__init__(
+            app,
             MetaModel,
             'meta',
             [

@@ -4,7 +4,8 @@ class BaseDatabase(object):
 
     def __init__(self, app, **kwargs):
         self.app = app
-        
+
+        self.event_output = kwargs.get('event_output')
         self.command_history = kwargs.get('command_history')
         self.account = kwargs.get('account')
         self.meta = kwargs.get('meta')

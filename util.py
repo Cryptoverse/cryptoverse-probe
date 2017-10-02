@@ -53,47 +53,6 @@ def get_unique_key():
     return sha256(str(uuid.uuid4()))
 
 
-def get_fleet_hash_name(stripped_public_key, length=6):
-    """Gets the human readable name for a fleet by hashing and shortening its stripped public key.
-
-    Args:
-        stripped_public_key (str): The fleet's public key after stripping.
-        length (int): The length of the shortened name.
-    
-    Returns:
-        str: The shortened name.
-    """
-    if stripped_public_key is None:
-        return '(No Name)'
-    return get_fleet_name(sha256(stripped_public_key), length)
-
-
-def get_fleet_name(fleet_hash, length=6):
-    """Gets the human readable name for a fleet.
-
-    Args:
-        fleet_hash (str): The fleet's Sha256 hash.
-        length (int): The length of the shortened name.
-    
-    Returns:
-        str: The shortened name.
-    """
-    return '(%s)' % get_shortened_hash(fleet_hash, length, False)
-
-
-def get_system_name(system_hash, length=6):
-    """Gets the human readable name for a system.
-
-    Args:
-        system_hash (str): The system's Sha256 hash.
-        length (int): The length of the shortened name.
-    
-    Returns:
-        str: The shortened name.
-    """
-    return '[%s]' % get_shortened_hash(system_hash, length)
-
-
 def get_shortened_hash(sha, length=6, strip_zeros=True):
     """Gets the human readable name for a hash.
 

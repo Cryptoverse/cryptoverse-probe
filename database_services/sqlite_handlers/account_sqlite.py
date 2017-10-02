@@ -4,8 +4,9 @@ from models.account_model import AccountModel
 
 class AccountSqlite(BaseSqliteHandler):
 
-    def __init__(self):
+    def __init__(self, app):
         super(AccountSqlite, self).__init__(
+            app,
             AccountModel,
             'accounts',
             [

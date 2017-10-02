@@ -6,8 +6,9 @@ class CommandHistorySqlite(BaseSqliteHandler):
 
     COMMAND_HISTORY_LIMIT = 100
 
-    def __init__(self):
+    def __init__(self, app):
         super(CommandHistorySqlite, self).__init__(
+            app,
             CommandHistoryModel,
             'command_history',
             [

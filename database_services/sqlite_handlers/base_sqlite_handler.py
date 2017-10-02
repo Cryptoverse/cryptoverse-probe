@@ -17,8 +17,8 @@ DATABASE_LOCATION = join_paths(APPLICATION_PATH, DATABASE_FILE_NAME)
 
 class BaseSqliteHandler(BaseDatabaseHandler):
 
-    def __init__(self, model_type, table_name, column_names):
-        super(BaseSqliteHandler, self).__init__(model_type)
+    def __init__(self, app, model_type, table_name, column_names):
+        super(BaseSqliteHandler, self).__init__(app, model_type)
         if table_name is None:
             raise ValueError('table_name cannot be None')
         if column_names is None:

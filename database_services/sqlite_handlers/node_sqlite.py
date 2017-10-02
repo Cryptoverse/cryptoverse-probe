@@ -4,8 +4,9 @@ from models.node_model import NodeModel
 
 class NodeSqlite(BaseSqliteHandler):
 
-    def __init__(self):
+    def __init__(self, app):
         super(NodeSqlite, self).__init__(
+            app,
             NodeModel,
             'nodes',
             [

@@ -4,8 +4,9 @@ from models.rules_model import RulesModel
 
 class RulesSqlite(BaseSqliteHandler):
 
-    def __init__(self):
+    def __init__(self, app):
         super(RulesSqlite, self).__init__(
+            app,
             RulesModel,
             'rules',
             [

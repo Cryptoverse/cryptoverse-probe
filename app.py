@@ -4,6 +4,7 @@ from callback_service import CallbackService
 from command_service import CommandService
 from blueprint_service import BlueprintService
 from remote_services.web_remote import WebRemote
+from galaxy_services.galaxy_generator import GalaxyGenerator
 
 class App(object):
 
@@ -19,6 +20,7 @@ class App(object):
         self.commands = CommandService(self)
         self.blueprints = BlueprintService(self)
         self.remote = WebRemote(self)
+        self.galaxy_generator = GalaxyGenerator()
 
     def get_platform_services(self):
         if platform == 'darwin':

@@ -51,7 +51,7 @@ class FleetsCommand(BaseCommand):
                             root_system = generate_root_galaxy_result.content.systems[0]
                             self.app.callbacks.on_output(
                                 self.concat_vessels(find_active_outputs_results.content, 
-                                                    root_system.hash,
+                                                    root_system.get_location(),
                                                     block.hash))
                         self.app.galaxy_generator.generate(on_generate_root_galaxy, root_block.hash, 0)
                     self.app.database.block.find_block_by_id(block.root_id, on_find_root)

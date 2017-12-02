@@ -8,9 +8,10 @@ class BaseGalaxyHandler(object):
     def __init__(self, galaxy_name):
         self.galaxy_name = galaxy_name
 
-    def generate(self, done, seed, distance_multiplier):
+    def generate(self, done, seed, count, distance_multiplier):
         galaxy = GalaxyModel()
         galaxy.hash = util.sha256(seed)
+        galaxy.count = count
         galaxy_cartesian = util.sha256("cartesian+%s" % seed)
         galaxy.x = int(galaxy_cartesian[:2], 16) * distance_multiplier
         galaxy.y = int(galaxy_cartesian[2:4], 16) * distance_multiplier
@@ -19,6 +20,7 @@ class BaseGalaxyHandler(object):
         for x in range(0, system_count):
             system = SystemModel()
             system.hash = util.sha256("system+%s+%s" % (x, seed))
+            system.galaxy_count = galaxy.count
             self.generate_system(system)
             galaxy.systems.append(system)
         done(CallbackResult(galaxy))

@@ -14,5 +14,5 @@ class GalaxyGenerator(object):
             weight, handler = weighted_handler
             if weight < galaxy_type:
                 continue
-            handler.generate(done, block_hash, count + 1)
+            handler.generate(done, block_hash, count, count + 1)
             break

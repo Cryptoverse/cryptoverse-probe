@@ -10,7 +10,8 @@ from commands import (
     sync_command,
     blocks_command,
     fleets_command,
-    galaxy_command
+    galaxy_command,
+    jrange_command
 )
 
 ALL_COMMANDS = [
@@ -25,5 +26,6 @@ ALL_COMMANDS = [
     sync_command.SyncCommand,
     blocks_command.BlocksCommand,
     fleets_command.FleetsCommand,
-    galaxy_command.GalaxyCommand
+    galaxy_command.GalaxyCommand,
+    jrange_command.JRangeCommand
 ]

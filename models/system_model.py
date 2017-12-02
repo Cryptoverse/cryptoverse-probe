@@ -5,9 +5,15 @@ class SystemModel(BaseModel):
     def __init__(self):
         super(SystemModel, self).__init__()
         self.hash = None
+        self.galaxy_count = 0
         self.x = 0
         self.y = 0
         self.z = 0
+
+
+    def get_location(self):
+        return '%s-%s' % (self.galaxy_count, self.hash)
+
 
     def get_pretty_content(self):
         content = super(SystemModel, self).get_pretty_content()
